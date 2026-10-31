@@ -3,7 +3,7 @@ import { expect, fn } from "storybook/test";
 
 import { prPaneView, worktreePaneView } from "../hooks/views";
 import { domUi, Terminal } from "./dom-ui";
-import { pr, worktree } from "./fixtures";
+import { images, pr, worktree } from "./fixtures";
 
 type PrArgs = Parameters<typeof prPaneView>[1];
 
@@ -38,4 +38,38 @@ export const Worktree: StoryObj<{ files: typeof worktree }> = {
 export const WorktreeLimpa: StoryObj<{ files: typeof worktree }> = {
 	render: ({ files }) => <Terminal>{worktreePaneView(domUi, files)}</Terminal>,
 	args: { files: [] },
+};
+
+export const Imagens: Story = {
+	args: {
+		pr: {
+			...pr,
+			files: [
+				...pr.files,
+				{ path: "assets/logo.svg", additions: 3, deletions: 3 },
+			],
+		},
+		tab: "images",
+		images,
+		onSelectTab: fn(),
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(canvas.getByText("docs/screenshot.png")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Arquivos" }));
+		await expect(args.onSelectTab).toHaveBeenCalledWith("files");
+	},
+};
+
+export const WorktreeImagens: StoryObj<{ files: typeof worktree }> = {
+	render: ({ files }) => (
+		<Terminal>
+			{worktreePaneView(domUi, files, { tab: "images", images })}
+		</Terminal>
+	),
+	args: {
+		files: [
+			...worktree,
+			{ path: "assets/logo.svg", status: "M", additions: 0, deletions: 0 },
+		],
+	},
 };

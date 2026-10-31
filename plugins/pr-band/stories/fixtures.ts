@@ -1,5 +1,5 @@
 import type { Pr } from "../types";
-import type { WorktreeFile } from "../hooks/views";
+import type { ChangedImage, WorktreeFile } from "../hooks/views";
 
 export const pr: Pr = {
 	number: 42,
@@ -9,6 +9,8 @@ export const pr: Pr = {
 	isDraft: false,
 	author: "gugacarbo",
 	branch: "feat/pr-band-files",
+	headSha: "abc123",
+	baseSha: "def456",
 	additions: 120,
 	deletions: 34,
 	changedFiles: 4,
@@ -33,4 +35,13 @@ export const worktree: WorktreeFile[] = [
 	{ path: "plugins/pr-band/hooks/views.tsx", status: "??", additions: 0, deletions: 0 },
 	{ path: "plugins/pr-band/hooks/register.tsx", status: "M", additions: 22, deletions: 110 },
 	{ path: ".storybook/main.ts", status: "M", additions: 1, deletions: 0 },
+];
+
+const dot = (color: string) =>
+	`data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="${color}"/></svg>`)}`;
+
+export const images: ChangedImage[] = [
+	{ path: "assets/logo.svg", status: "modified", before: { uri: dot("#d97757") }, after: { uri: dot("#16a34a") } },
+	{ path: "docs/screenshot.png", status: "added", after: { uri: dot("#58a6ff") } },
+	{ path: "docs/old.png", status: "deleted", before: { missing: "grande demais para o painel (instale o ffmpeg para reduzir)" } },
 ];

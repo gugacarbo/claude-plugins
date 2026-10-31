@@ -7,7 +7,33 @@ import type { Pr } from "../types";
 export type Ui = Pick<
 	ReturnType<EngineInterface["ui"]["resolve"]>,
 	"Box" | "Text" | "Button" | "Link" | "Markdown"
->;
+> & {
+	// Desktop, the editor and mobile draw it; the terminal has none.
+	Svg?: (props: {
+		source: string;
+		alt: string;
+		width?: number;
+		height?: number;
+	}) => ReturnType<Ui["Text"]>;
+};
+
+export type PaneTab = "files" | "images";
+
+// One side of a changed image: its bytes as a data URI, or why it is not shown.
+export type Picture = { uri: string } | { missing: string };
+
+export type ChangedImage = {
+	path: string;
+	status: "added" | "modified" | "deleted";
+	before?: Picture;
+	after?: Picture;
+};
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
+
+export function isImage(path: string) {
+	return IMAGE_EXT.test(path);
+}
 
 // Where the session is: the branch name, and whether the checkout is a linked
 // worktree (`git worktree add`) rather than the main one.
@@ -127,10 +153,23 @@ export function bandView(
 }
 
 export function prPaneView(
-	{ Box, Text, Link, Markdown, Button }: Ui,
-	props: { pr: Pr | undefined; onRefresh: () => void },
+	ui: Ui,
+	props: {
+		pr: Pr | undefined;
+		onRefresh: () => void;
+		tab?: PaneTab;
+		images?: ChangedImage[];
+		onSelectTab?: (tab: PaneTab) => void;
+	},
 ) {
-	const { pr, onRefresh } = props;
+	const { Box, Text, Link, Markdown, Button } = ui;
+	const {
+		pr,
+		onRefresh,
+		tab = "files",
+		images,
+		onSelectTab = () => {},
+	} = props;
 	if (!pr) return <Text dimColor>Nenhum PR selecionado.</Text>;
 
 	return (
@@ -149,7 +188,13 @@ export function prPaneView(
 				Review: {pr.review} · CI: {pr.checks}
 			</Text>
 			<Text dimColor>Relação: {pr.source}</Text>
-			{pr.files.length > 0 && (
+			{tabsView(ui, {
+				tab,
+				images: pr.files.filter((f) => isImage(f.path)).length,
+				onSelect: onSelectTab,
+			})}
+			{tab === "images" && imagesView(ui, images)}
+			{tab === "files" && pr.files.length > 0 && (
 				<Box flexDirection="column">
 					<Text bold>Arquivos alterados</Text>
 					{pr.files.map((f) => (
@@ -165,13 +210,23 @@ export function prPaneView(
 					)}
 				</Box>
 			)}
-			<Markdown text={pr.body || "_Sem descrição._"} />
+			{tab === "files" && <Markdown text={pr.body || "_Sem descrição._"} />}
 			<Button key="refresh" label="Atualizar" onPress={onRefresh} />
 		</Box>
 	);
 }
 
-export function worktreePaneView({ Box, Text }: Ui, files: WorktreeFile[]) {
+export function worktreePaneView(
+	ui: Ui,
+	files: WorktreeFile[],
+	props: {
+		tab?: PaneTab;
+		images?: ChangedImage[];
+		onSelectTab?: (tab: PaneTab) => void;
+	} = {},
+) {
+	const { Box, Text } = ui;
+	const { tab = "files", images, onSelectTab = () => {} } = props;
 	if (files.length === 0)
 		return <Text dimColor>Nenhuma alteração na worktree.</Text>;
 
@@ -182,15 +237,106 @@ export function worktreePaneView({ Box, Text }: Ui, files: WorktreeFile[]) {
 					? "1 arquivo alterado"
 					: `${files.length} arquivos alterados`}
 			</Text>
-			<Box flexDirection="column">
-				{files.map((f) => (
-					<Text key={`wt-${f.path}`}>
-						<Text dimColor>{f.status.padEnd(2)}</Text>{" "}
-						<Text color="green">+{f.additions}</Text>{" "}
-						<Text color="red">−{f.deletions}</Text> {f.path}
-					</Text>
-				))}
-			</Box>
+			{tabsView(ui, {
+				tab,
+				images: files.filter((f) => isImage(f.path)).length,
+				onSelect: onSelectTab,
+			})}
+			{tab === "images" && imagesView(ui, images)}
+			{tab === "files" && (
+				<Box flexDirection="column">
+					{files.map((f) => (
+						<Text key={`wt-${f.path}`}>
+							<Text dimColor>{f.status.padEnd(2)}</Text>{" "}
+							<Text color="green">+{f.additions}</Text>{" "}
+							<Text color="red">−{f.deletions}</Text> {f.path}
+						</Text>
+					))}
+				</Box>
+			)}
+		</Box>
+	);
+}
+
+export function tabsView(
+	{ Box, Button }: Ui,
+	props: { tab: PaneTab; images: number; onSelect: (tab: PaneTab) => void },
+) {
+	const { tab, images, onSelect } = props;
+	return (
+		<Box flexDirection="row" gap={1}>
+			<Button
+				key="tab-files"
+				label="Arquivos"
+				variant={tab === "files" ? "primary" : "secondary"}
+				onPress={() => onSelect("files")}
+			/>
+			<Button
+				key="tab-images"
+				label={`Imagens (${images})`}
+				variant={tab === "images" ? "primary" : "secondary"}
+				onPress={() => onSelect("images")}
+			/>
+		</Box>
+	);
+}
+
+const BOX_W = 260;
+const BOX_H = 180;
+
+function pictureView(
+	{ Box, Text, Svg }: Ui,
+	label: string,
+	pic: Picture | undefined,
+	alt: string,
+) {
+	if (!pic) return null;
+	return (
+		<Box flexDirection="column">
+			<Text dimColor>{label}</Text>
+			{"missing" in pic ? (
+				<Text dimColor>{pic.missing}</Text>
+			) : Svg ? (
+				<Svg
+					source={`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BOX_W} ${BOX_H}" width="${BOX_W}" height="${BOX_H}"><image href="${pic.uri}" width="${BOX_W}" height="${BOX_H}" preserveAspectRatio="xMidYMid meet"/></svg>`}
+					alt={alt}
+					width={BOX_W}
+					height={BOX_H}
+				/>
+			) : (
+				<Text dimColor>(imagem não exibida no terminal)</Text>
+			)}
+		</Box>
+	);
+}
+
+const STATUS_LABEL = {
+	added: ["green", "adicionada"],
+	modified: ["yellow", "alterada"],
+	deleted: ["red", "removida"],
+} as const;
+
+export function imagesView(ui: Ui, images: ChangedImage[] | undefined) {
+	const { Box, Text } = ui;
+	if (!images) return <Text dimColor>Carregando imagens…</Text>;
+	if (images.length === 0)
+		return <Text dimColor>Nenhuma imagem alterada.</Text>;
+	return (
+		<Box flexDirection="column" gap={1}>
+			{images.map((img) => {
+				const [color, label] = STATUS_LABEL[img.status];
+				return (
+					<Box key={`img-${img.path}`} flexDirection="column">
+						<Text>
+							<Text color={color}>{label}</Text> {img.path}
+						</Text>
+						<Box flexDirection="row" gap={2}>
+							{pictureView(ui, "antes", img.before, `${img.path}, antes`)}
+							{pictureView(ui, "depois", img.after, `${img.path}, depois`)}
+						</Box>
+					</Box>
+				);
+			})}
 		</Box>
 	);
 }

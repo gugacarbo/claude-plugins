@@ -8,6 +8,9 @@ export type Pr = {
   isDraft: boolean
   author: string
   branch: string
+  /** Commits the images tab reads the PR's files at. */
+  headSha: string
+  baseSha: string
   additions: number
   deletions: number
   changedFiles: number
@@ -20,6 +23,12 @@ export type Pr = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'pr-band': { prs: Shaped<Pr[]>; selected: number | null }
+    'pr-band': {
+      prs: Shaped<Pr[]>
+      selected: number | null
+      /** The tab each pane shows: changed files or changed images. */
+      prTab: 'files' | 'images'
+      worktreeTab: 'files' | 'images'
+    }
   }
 }

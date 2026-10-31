@@ -2,6 +2,7 @@ import type { EngineInterface, Register } from "claude-code";
 import { atom, read, update } from "claude-code";
 
 import type { Pr } from "../types";
+import { prImages, worktreeImages } from "./images";
 import {
 	bandView,
 	type GitHead,
@@ -13,12 +14,17 @@ import {
 const PANE = "pr-band";
 const WORKTREE_PANE = "pr-band-worktree";
 const prs = atom({ plugin: "pr-band", key: "prs" } as const, [], {
-	shape: "prs-2",
+	shape: "prs-3",
 });
 const selected = atom({ plugin: "pr-band", key: "selected" } as const, null);
+const prTab = atom({ plugin: "pr-band", key: "prTab" } as const, "files");
+const worktreeTab = atom(
+	{ plugin: "pr-band", key: "worktreeTab" } as const,
+	"files",
+);
 
 const FIELDS =
-	"number,title,url,state,isDraft,author,headRefName,additions,deletions,changedFiles,reviewDecision,statusCheckRollup,body,files";
+	"number,title,url,state,isDraft,author,headRefName,headRefOid,baseRefOid,additions,deletions,changedFiles,reviewDecision,statusCheckRollup,body,files";
 // Links like github.com/owner/repo/pull/12 in prompts or tool output.
 const PR_URL = /github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)/g;
 
@@ -62,6 +68,8 @@ async function fetchPr(
 		isDraft: raw.isDraft,
 		author: raw.author?.login ?? "",
 		branch: raw.headRefName,
+		headSha: raw.headRefOid ?? "",
+		baseSha: raw.baseRefOid ?? "",
 		additions: raw.additions,
 		deletions: raw.deletions,
 		changedFiles: raw.changedFiles,
@@ -225,11 +233,15 @@ export const register: Register = (on) => {
 	on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
 		const n = await read($, selected);
 		const pr = (await read($, prs)).find((p) => p.number === n);
+		const tab = await read($, prTab);
 		return prPaneView($.ui.resolve(e), {
 			pr,
 			onRefresh: () => {
 				if (pr) void fetchPr($, String(pr.number), pr.source);
 			},
+			tab,
+			images: tab === "images" && pr ? await prImages($, pr) : undefined,
+			onSelectTab: (t) => void update($, prTab, () => t),
 		});
 	});
 
@@ -237,7 +249,13 @@ export const register: Register = (on) => {
 		"ui.render",
 		{ component: "Pane", requestId: WORKTREE_PANE },
 		async ($, e) => {
-			return worktreePaneView($.ui.resolve(e), await worktreeChanges($));
+			const files = await worktreeChanges($);
+			const tab = await read($, worktreeTab);
+			return worktreePaneView($.ui.resolve(e), files, {
+				tab,
+				images: tab === "images" ? await worktreeImages($, files) : undefined,
+				onSelectTab: (t) => void update($, worktreeTab, () => t),
+			});
 		},
 	);
 };

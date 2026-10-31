@@ -103,7 +103,12 @@ const Markdown = ({ text }: { text: string }) => (
 	<div style={{ whiteSpace: "pre-wrap", opacity: 0.85 }}>{text}</div>
 );
 
-export const domUi = { Box, Text, Button, Link, Markdown } as unknown as Ui;
+// The desktop draws an Svg as an image.
+const Svg = ({ source, alt, width, height }: { source: string; alt: string; width?: number; height?: number }) => (
+	<img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`} alt={alt} width={width} height={height} />
+);
+
+export const domUi = { Box, Text, Button, Link, Markdown, Svg } as unknown as Ui;
 
 export const Terminal = ({ children }: { children: ReactNode }) => (
 	<div

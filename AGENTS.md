@@ -40,6 +40,9 @@ src/
 - Fontes dos PRs (via `gh pr view`): PR da branch atual; PRs criados/editados/mergeados na
   sessão (`gitOperation.pr` do resultado do Bash); links `github.com/.../pull/N` citados no chat
   ou na saída de comandos. Atualiza ao fim de cada turno.
+- Os painéis do PR e da worktree têm as abas Arquivos e Imagens. Imagens mostra antes/depois de
+  cada imagem alterada (PR: `gh api` no base e no head; worktree: `HEAD` e o disco) num `Svg`
+  com data URI, limitado a 131072 caracteres; acima disso reduz com `ffmpeg` se houver.
 - `plugins/pr-band/.claude-plugin/types/` é gerado pelo Claude Code ao carregar o mod e não é
   versionado. O `tsc` da raiz cobre só `src/`; valide o mod com `claude plugin validate`.
 
