@@ -3,3 +3,6 @@ dist/
 coverage/
 # Tipos gerados pelo Claude Code ao carregar um mod
 plugins/*/.claude-plugin/types/
+
+# logs gerados pelos mods em runtime
+.claude/mods-logs/

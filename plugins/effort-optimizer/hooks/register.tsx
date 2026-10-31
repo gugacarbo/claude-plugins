@@ -4,6 +4,7 @@ import type { Band, Level } from '../types'
 
 const BAND = { plugin: 'effort-optimizer', key: 'band' } as const
 const OVERRIDE = { plugin: 'effort-optimizer', key: 'override' } as const
+const CHECKING = { plugin: 'effort-optimizer', key: 'checking' } as const
 // Fits the footer slot (about 14 cells).
 const SHORT = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'XHigh', max: 'Max' } as const
 
@@ -247,20 +248,12 @@ async function showApplied($: EngineInterface, p: Pick, from: Level | '', note: 
 // Suggest mode: pick before the prompt goes in and, when the level differs, hold the prompt until the person answers.
 async function suggest($: EngineInterface, text: string, mine: number) {
   const now = await currentLevel($)
-  try {
-    await $.ui.status('checking effort…')
-  } catch {
-    // The status line is a nicety.
-  }
+  await $.state.set(CHECKING, 'checking effort…').catch(() => undefined)
   let p: Pick | null = null
   try {
     p = await pick($, text, now)
   } finally {
-    try {
-      await $.ui.status(undefined)
-    } catch {
-      // Nothing to clear.
-    }
+    await $.state.set(CHECKING, null).catch(() => undefined)
   }
   if (!p || mine !== gen || p.level === now) return
   const go = `Switch to ${NAMES[p.level]}`
@@ -288,11 +281,7 @@ async function suggest($: EngineInterface, text: string, mine: number) {
 // Auto mode: pick before the prompt goes in, so the first request already runs at the right level.
 async function autoAdjust($: EngineInterface, text: string, mine: number) {
   const now = await currentLevel($)
-  try {
-    await $.ui.status('picking effort…')
-  } catch {
-    // The status line is a nicety.
-  }
+  await $.state.set(CHECKING, 'picking effort…').catch(() => undefined)
   try {
     const p = await pick($, text, now)
     if (!p || mine !== gen) return
@@ -303,11 +292,7 @@ async function autoAdjust($: EngineInterface, text: string, mine: number) {
     const note = await applyLevel($, p.level)
     await showApplied($, p, now, note)
   } finally {
-    try {
-      await $.ui.status(undefined)
-    } catch {
-      // Nothing to clear.
-    }
+    await $.state.set(CHECKING, null).catch(() => undefined)
   }
 }
 
@@ -468,10 +453,24 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (off || !enabled || e.props.hasSurvey) return next(e)
+    const { value: checking } = await $.state.get(CHECKING)
     const b = await getBand($)
-    if (!b) return next(e)
+    if (!b && !checking) return next(e)
     const rest = await next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
+
+    if (checking) {
+      return (
+        <Box flexDirection="column">
+          {rest}
+          <Text>
+            <Text color={ACCENT}>◌</Text>
+            <Text dimColor> {checking}</Text>
+          </Text>
+        </Box>
+      )
+    }
+    if (!b) return rest
     const noop = () => undefined
 
     if (b.phase === 'applied') {

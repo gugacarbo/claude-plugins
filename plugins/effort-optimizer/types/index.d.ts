@@ -19,6 +19,8 @@ declare module 'claude-code' {
   interface PluginState {
     'effort-optimizer': {
       band: Band | null
+      /** Shown above the prompt while the pick runs, e.g. "picking effort…". */
+      checking: string | null
       /** The level the mod puts on every main-chat request when the effort setting could not be changed. */
       override: Level | null
     }
