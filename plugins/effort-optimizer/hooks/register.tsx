@@ -1,6 +1,6 @@
-import type { ConfigRow, EngineInterface, Register, SessionMessage } from 'claude-code'
+import type { ConfigRow, EngineInterface, ModelUsage, Register, SessionMessage } from 'claude-code'
 
-import type { Band, Level } from '../types'
+import type { Band, Level, UsageCall, UsageLog, UsageTotals } from '../types'
 
 const BAND = { plugin: 'effort-optimizer', key: 'band' } as const
 const OVERRIDE = { plugin: 'effort-optimizer', key: 'override' } as const
@@ -222,6 +222,7 @@ function parsePick(text: string): Pick | null {
 async function pick($: EngineInterface, text: string, now: Level | ''): Promise<Pick | null> {
   const messages = await $.session.messages()
   const lastReply = lastAssistantText(messages).slice(0, 600)
+  const startedAt = await $.clock.now()
   const r = await $.model.complete({
     model: 'claude-sonnet-5-5',
     prompt: pickPrompt(text.slice(0, 4000), lastReply, now),
@@ -229,8 +230,90 @@ async function pick($: EngineInterface, text: string, now: Level | ''): Promise<
     effort: 'low',
     timeoutMs: 20_000,
   })
+  const ms = Math.max(0, (await $.clock.now()) - startedAt)
+  if ('usage' in r) await recordUsage($, r.usage, ms, r.isAnswered).catch(err => log($, 'usage', err))
   if (!r.isAnswered) throw new Error(`pick failed: ${r.reason}`)
   return parsePick(r.text)
+}
+
+// Claude Sonnet 5.5 list prices, USD per million tokens; a 5 minute cache write costs 1.25x input.
+const PRICE = { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 } as const
+const USAGE_KEY = 'usage'
+// Keeps the store far under its 4 MiB limit.
+const MAX_CALLS = 500
+
+function emptyTotals(): UsageTotals {
+  return { calls: 0, failed: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, ms: 0, usd: 0 }
+}
+
+function addTo(t: UsageTotals, c: UsageCall): UsageTotals {
+  return {
+    calls: t.calls + 1,
+    failed: t.failed + (c.ok ? 0 : 1),
+    input: t.input + c.input,
+    output: t.output + c.output,
+    cacheRead: t.cacheRead + c.cacheRead,
+    cacheWrite: t.cacheWrite + c.cacheWrite,
+    ms: t.ms + c.ms,
+    usd: t.usd + c.usd,
+  }
+}
+
+// The local calendar day, e.g. 2026-10-31.
+function dayKey(at: number) {
+  const d = new Date(at)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+async function readUsage($: EngineInterface): Promise<UsageLog> {
+  const raw = (await $.store.get(USAGE_KEY)) as Partial<UsageLog> | undefined
+  return {
+    total: { ...emptyTotals(), ...(raw?.total ?? {}) },
+    days: raw?.days ?? {},
+    calls: Array.isArray(raw?.calls) ? raw.calls : [],
+  }
+}
+
+async function recordUsage($: EngineInterface, u: ModelUsage, ms: number, ok: boolean) {
+  const at = await $.clock.now()
+  const call: UsageCall = {
+    at: new Date(at).toISOString(),
+    ms,
+    ok,
+    input: u.input_tokens,
+    output: u.output_tokens,
+    cacheRead: u.cache_read_input_tokens,
+    cacheWrite: u.cache_creation_input_tokens,
+    usd:
+      (u.input_tokens * PRICE.input +
+        u.output_tokens * PRICE.output +
+        u.cache_read_input_tokens * PRICE.cacheRead +
+        u.cache_creation_input_tokens * PRICE.cacheWrite) /
+      1_000_000,
+  }
+  const log = await readUsage($)
+  const day = dayKey(at)
+  await $.store.set(USAGE_KEY, {
+    total: addTo(log.total, call),
+    days: { ...log.days, [day]: addTo(log.days[day] ?? emptyTotals(), call) },
+    calls: [...log.calls, call].slice(-MAX_CALLS),
+  } satisfies UsageLog)
+}
+
+function fmtUsd(v: number) {
+  return `US$ ${v < 0.01 && v > 0 ? v.toFixed(4) : v.toFixed(2)}`
+}
+
+function fmtTotals(t: UsageTotals) {
+  if (!t.calls) return '  nenhuma checagem'
+  const avg = (t.ms / t.calls / 1000).toFixed(1)
+  return [
+    `  checagens: ${t.calls}${t.failed ? ` (${t.failed} com falha)` : ''}`,
+    `  tokens: ${t.input.toLocaleString('pt-BR')} de entrada, ${t.output.toLocaleString('pt-BR')} de saída` +
+      (t.cacheRead || t.cacheWrite ? `, ${t.cacheRead.toLocaleString('pt-BR')} lidos do cache, ${t.cacheWrite.toLocaleString('pt-BR')} gravados` : ''),
+    `  tempo: ${(t.ms / 1000).toFixed(1)} s no total, ${avg} s em média`,
+    `  custo estimado: ${fmtUsd(t.usd)}`,
+  ].join('\n')
 }
 
 async function hideLater($: EngineInterface, id: number) {
@@ -303,6 +386,10 @@ export const register: Register = on => {
       name: 'effort-optimizer',
       description: 'Effort Optimizer. auto: set effort by itself. suggest: offer a switch. off or on',
       argumentHint: '[auto|suggest|off|on]',
+    })
+    await $.command.register({
+      name: 'effort-optimizer-usage',
+      description: 'Effort Optimizer: gasto das checagens com o Sonnet, hoje e no histórico',
     })
     enabled = (await $.store.get('enabled')) !== false
     mode = (await $.store.get('mode')) === 'auto' ? 'auto' : 'suggest'
@@ -393,6 +480,23 @@ export const register: Register = on => {
         `This chat runs at: ${now ? NAMES[now] : 'unknown yet'}${value ? ` (held by the mod: ${NAMES[value]})` : ''}.`,
         `Effort setting: ${rowKey || 'not found, the mod sets the level on each request'}.`,
         'Type /effort-optimizer auto, suggest, off or on.',
+      ].join('\n'),
+    }
+  })
+
+  on('command.run', { command: 'effort-optimizer-usage' }, async $ => {
+    const u = await readUsage($)
+    const today = dayKey(await $.clock.now())
+    const days = Object.keys(u.days).sort()
+    return {
+      text: [
+        `Gasto do Effort Optimizer com o Sonnet 5.5 (preço de tabela da API, estimado):`,
+        '',
+        `Hoje (${today}):`,
+        fmtTotals(u.days[today] ?? emptyTotals()),
+        '',
+        `Histórico${days.length ? ` (desde ${days[0]}, ${days.length} dia${days.length > 1 ? 's' : ''})` : ''}:`,
+        fmtTotals(u.total),
       ].join('\n'),
     }
   })

@@ -28,6 +28,7 @@ The effort menu next to the model name keeps showing your own setting. The Claud
 - `/effort-optimizer auto` turns on auto mode.
 - `/effort-optimizer suggest` goes back to the pop-up.
 - `/effort-optimizer off` and `/effort-optimizer on` turn the mod off and on.
+- `/effort-optimizer-usage` mostra o gasto das checagens com o Sonnet: hoje e o histórico (tokens de entrada e saída, tempo e custo estimado pelo preço de tabela da API).
 
 ## Install
 

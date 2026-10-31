@@ -15,6 +15,41 @@ export type Band = {
   note: string
 }
 
+/** One Sonnet check, as kept in `$.store` under `usage`. */
+export type UsageCall = {
+  /** When the call ended, ISO. */
+  at: string
+  /** How long the call took. */
+  ms: number
+  /** False when the model gave no usable reply. */
+  ok: boolean
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  /** Estimated cost at Sonnet 5.5 list prices. */
+  usd: number
+}
+
+export type UsageTotals = {
+  calls: number
+  failed: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  ms: number
+  usd: number
+}
+
+export type UsageLog = {
+  total: UsageTotals
+  /** Totals per local day, keyed YYYY-MM-DD. */
+  days: Record<string, UsageTotals>
+  /** The latest calls, oldest first, capped. */
+  calls: UsageCall[]
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'effort-optimizer': {
