@@ -2,10 +2,9 @@
 
 Marketplace pessoal de plugins do Claude Code.
 
-| Plugin       | O que faz                                                                                                  |
-| ------------ | ---------------------------------------------------------------------------------------------------------- |
-| `pr-context` | Skill e comando `/related-prs`: o Claude busca PRs relacionados à conversa e resume cada um.               |
-| `pr-band`    | Mod só código: faixa acima do prompt com os PRs relacionados; ao clicar, abre o resumo num painel lateral. |
+| Plugin    | O que faz                                                                                                  |
+| --------- | ---------------------------------------------------------------------------------------------------------- |
+| `pr-band` | Mod só código: faixa acima do prompt com os PRs relacionados; ao clicar, abre o resumo num painel lateral. |
 
 ## Instalar ou atualizar
 
@@ -30,7 +29,6 @@ Abra uma nova sessão do Claude Code depois de instalar ou atualizar.
 
 ```bash
 claude plugin marketplace add gugacarbo/claude-plugins
-claude plugin install pr-context@gugacarbo-plugins
 claude plugin install pr-band@gugacarbo-plugins
 ```
 

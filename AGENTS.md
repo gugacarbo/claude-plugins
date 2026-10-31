@@ -7,8 +7,8 @@ Marketplace pessoal de plugins do Claude Code (`gugacarbo-plugins`).
 ```
 .claude-plugin/marketplace.json   # lista dos plugins do marketplace
 plugins/
-  pr-context/                     # skill + comando /related-prs (usa o agente)
   pr-band/                        # mod só código: faixa acima do prompt + painel lateral
+  effort-optimizer/               # mod de terceiros (Ben AI): escolhe o effort de cada prompt
 src/
   index.ts                        # CLI: install | update | status [--remote] [--dry-run]
   plan.ts                         # lógica pura do que rodar (testada em plan.test.ts)

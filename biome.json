@@ -12,7 +12,8 @@
 			"!**/playwright-report",
 			"!**/.vitest-coverage*",
 			"!**/storybook-static",
-			"!**/src/routeTree.gen.ts"
+			"!**/src/routeTree.gen.ts",
+			"!**/plugins/effort-optimizer"
 		]
 	},
 	"formatter": {
