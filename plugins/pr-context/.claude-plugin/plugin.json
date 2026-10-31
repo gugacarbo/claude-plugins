@@ -1,0 +1,6 @@
+{
+  "name": "pr-context",
+  "version": "0.1.0",
+  "description": "Encontra PRs do GitHub relacionados à conversa atual e gera um resumo de cada um.",
+  "author": { "name": "Gustavo" }
+}

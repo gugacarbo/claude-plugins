@@ -1,0 +1,5 @@
+# Gerado por project-init (git/husky). Adicione comandos abaixo, ex.:
+# pnpm exec lint-staged
+# bunx lint-staged
+bunx lint-staged
+gitleaks git --pre-commit --staged --redact --verbose

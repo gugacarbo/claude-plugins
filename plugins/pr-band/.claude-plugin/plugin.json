@@ -1,0 +1,9 @@
+{
+  "name": "pr-band",
+  "version": "0.1.0",
+  "description": "Mostra acima do prompt os PRs relacionados à conversa e abre o resumo num painel lateral.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Gustavo Carbonera"
+  }
+}

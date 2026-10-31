@@ -1,0 +1,16 @@
+{
+  "name": "gugacarbo-plugins",
+  "owner": { "name": "Gustavo Carbonera" },
+  "plugins": [
+    {
+      "name": "pr-context",
+      "source": "./plugins/pr-context",
+      "description": "Skill e comando /related-prs que encontram e resumem PRs relacionados à conversa."
+    },
+    {
+      "name": "pr-band",
+      "source": "./plugins/pr-band",
+      "description": "Faixa acima do prompt com os PRs relacionados e painel lateral com o resumo (só código)."
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+	"name": "claude-plugins",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Marketplace pessoal de plugins do Claude Code e script de instalação.",
+	"engines": {
+		"bun": ">=1.2"
+	},
+	"scripts": {
+		"dev": "bun --watch src/index.ts",
+		"build": "bun build src/index.ts --outdir dist --target bun",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"test:watch": "bun test --watch",
+		"test:coverage": "bun test --coverage",
+		"lint": "biome lint .",
+		"format": "biome format .",
+		"check": "biome check .",
+		"knip": "knip",
+		"knip:report": "knip --no-exit-code",
+		"spell": "cspell lint \"**/*.{ts,tsx,md,json,yaml}\"",
+		"format:md": "prettier --write \"**/*.{md,yml,yaml,sh}\"",
+		"format:check": "prettier --check \"**/*.{md,yml,yaml,sh}\"",
+		"plugins:install": "bun src/index.ts install",
+		"plugins:update": "bun src/index.ts update",
+		"plugins:status": "bun src/index.ts status",
+		"prepare": "husky"
+	},
+	"lint-staged": {
+		"*.{js,mjs,cjs,ts,tsx}": [
+			"biome check --write --no-errors-on-unmatched"
+		],
+		"*.{md,yml,yaml}": [
+			"prettier --write"
+		]
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.5.13",
+		"@commitlint/cli": "^21.2.4",
+		"@commitlint/config-conventional": "^21.2.4",
+		"@cspell/dict-pt-br": "^2.4.4",
+		"@types/bun": "^1.4.4",
+		"cspell": "^10",
+		"husky": "^9.1.7",
+		"knip": "^6",
+		"lint-staged": "^17.6.0",
+		"prettier": "^3",
+		"prettier-plugin-sh": "^0.20.2",
+		"typescript": "^7.0.2"
+	}
+}

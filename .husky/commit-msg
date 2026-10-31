@@ -1,0 +1,4 @@
+# Gerado por project-init (git/husky). A opção git/commitlint preenche este hook com:
+# pnpm exec commitlint --edit "$1"
+# ou: bunx commitlint --edit "$1"
+bunx commitlint --edit "$1"
