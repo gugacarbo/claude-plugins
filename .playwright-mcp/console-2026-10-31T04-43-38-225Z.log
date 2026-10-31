@@ -1,0 +1,2 @@
+[    1957ms] [WARNING] The 'ariaLabel' prop on 'PopoverProvider' will become mandatory in Storybook 11. Provide a concise, accessible label describing the popover's purpose. @ http://localhost:6006/sb-manager/globals-runtime.js:122
+[    5427ms] [WARNING] Accessing the Story Store is deprecated and will be removed in 9.0 @ http://localhost:6006/@vite/client:367

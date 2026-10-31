@@ -2,6 +2,12 @@ import type { EngineInterface, Register } from "claude-code";
 import { atom, read, update } from "claude-code";
 
 import type { Pr } from "../types";
+import {
+	bandView,
+	prPaneView,
+	type WorktreeFile,
+	worktreePaneView,
+} from "./views";
 
 const PANE = "pr-band";
 const WORKTREE_PANE = "pr-band-worktree";
@@ -78,13 +84,6 @@ async function fetchPr(
 			: [...list, merged];
 	});
 }
-
-type WorktreeFile = {
-	path: string;
-	status: string;
-	additions: number;
-	deletions: number;
-};
 
 // Changes of the current worktree against HEAD, untracked files included.
 async function worktreeChanges($: EngineInterface): Promise<WorktreeFile[]> {
@@ -183,120 +182,36 @@ export const register: Register = (on) => {
 	on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
 		if (e.props.hasSurvey) return next(e);
 		const list = await read($, prs);
-		const { Box, Button, Text } = $.ui.resolve(e);
 
 		const openPr = async (n: number) => {
 			await update($, selected, () => n);
 			await $.ui.open({ id: PANE, title: `PR #${n}` });
 		};
 
-		if (list.length === 0) {
-			return (
-				<Box flexDirection="row" gap={1}>
-					<Text dimColor>Nenhum PR relacionado a esta conversa</Text>
-					<Button
-						key="worktree"
-						label="Ver alterações da worktree"
-						onPress={() =>
-							$.ui.open({ id: WORKTREE_PANE, title: "Alterações da worktree" })
-						}
-					/>
-				</Box>
-			);
-		}
-		return (
-			<Box flexDirection="row" gap={1}>
-				<Text dimColor>
-					{list.length === 1
-						? "1 PR relacionado:"
-						: `${list.length} PRs relacionados:`}
-				</Text>
-				{list.slice(0, 5).map((pr) => (
-					<Button
-						key={`pr-${pr.number}`}
-						label={`#${pr.number} ${pr.title.slice(0, 40)} · ${pr.state.toLowerCase()}`}
-						onPress={() => openPr(pr.number)}
-					/>
-				))}
-			</Box>
-		);
+		return bandView($.ui.resolve(e), {
+			prs: list,
+			onOpenPr: (n) => void openPr(n),
+			onOpenWorktree: () =>
+				void $.ui.open({ id: WORKTREE_PANE, title: "Alterações da worktree" }),
+		});
 	});
 
 	on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
-		const { Box, Text, Link, Markdown, Button } = $.ui.resolve(e);
 		const n = await read($, selected);
 		const pr = (await read($, prs)).find((p) => p.number === n);
-		if (!pr) return <Text dimColor>Nenhum PR selecionado.</Text>;
-
-		return (
-			<Box flexDirection="column" gap={1}>
-				<Text bold>
-					#{pr.number} {pr.title}
-				</Text>
-				<Link href={pr.url} label="Abrir no GitHub" />
-				<Text>
-					{pr.state.toLowerCase()} · {pr.author} · {pr.branch}
-				</Text>
-				<Text>
-					+{pr.additions} / −{pr.deletions} em {pr.changedFiles} arquivos
-				</Text>
-				<Text>
-					Review: {pr.review} · CI: {pr.checks}
-				</Text>
-				<Text dimColor>Relação: {pr.source}</Text>
-				{pr.files.length > 0 && (
-					<Box flexDirection="column">
-						<Text bold>Arquivos alterados</Text>
-						{pr.files.map((f) => (
-							<Text key={`file-${f.path}`}>
-								<Text color="green">+{f.additions}</Text>{" "}
-								<Text color="red">−{f.deletions}</Text> {f.path}
-							</Text>
-						))}
-						{pr.files.length < pr.changedFiles && (
-							<Text dimColor>
-								… e mais {pr.changedFiles - pr.files.length} arquivos
-							</Text>
-						)}
-					</Box>
-				)}
-				<Markdown text={pr.body || "_Sem descrição._"} />
-				<Button
-					key="refresh"
-					label="Atualizar"
-					onPress={() => fetchPr($, String(pr.number), pr.source)}
-				/>
-			</Box>
-		);
+		return prPaneView($.ui.resolve(e), {
+			pr,
+			onRefresh: () => {
+				if (pr) void fetchPr($, String(pr.number), pr.source);
+			},
+		});
 	});
 
 	on(
 		"ui.render",
 		{ component: "Pane", requestId: WORKTREE_PANE },
 		async ($, e) => {
-			const { Box, Text } = $.ui.resolve(e);
-			const files = await worktreeChanges($);
-			if (files.length === 0)
-				return <Text dimColor>Nenhuma alteração na worktree.</Text>;
-
-			return (
-				<Box flexDirection="column" gap={1}>
-					<Text bold>
-						{files.length === 1
-							? "1 arquivo alterado"
-							: `${files.length} arquivos alterados`}
-					</Text>
-					<Box flexDirection="column">
-						{files.map((f) => (
-							<Text key={`wt-${f.path}`}>
-								<Text dimColor>{f.status.padEnd(2)}</Text>{" "}
-								<Text color="green">+{f.additions}</Text>{" "}
-								<Text color="red">−{f.deletions}</Text> {f.path}
-							</Text>
-						))}
-					</Box>
-				</Box>
-			);
+			return worktreePaneView($.ui.resolve(e), await worktreeChanges($));
 		},
 	);
 };
