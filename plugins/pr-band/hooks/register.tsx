@@ -4,6 +4,7 @@ import { atom, read, update } from "claude-code";
 import type { Pr } from "../types";
 import {
 	bandView,
+	type GitHead,
 	prPaneView,
 	type WorktreeFile,
 	worktreePaneView,
@@ -109,6 +110,23 @@ async function worktreeChanges($: EngineInterface): Promise<WorktreeFile[]> {
 		});
 }
 
+async function gitHead($: EngineInterface): Promise<GitHead> {
+	const r = await $.process.run(
+		[
+			"git",
+			"rev-parse",
+			"--abbrev-ref",
+			"HEAD",
+			"--path-format=absolute",
+			"--git-dir",
+			"--git-common-dir",
+		],
+		{ timeoutMs: 15000 },
+	);
+	const [branch = "", gitDir, commonDir] = r.stdout.trim().split("\n");
+	return { branch, isWorktree: gitDir !== commonDir };
+}
+
 async function refreshAll($: EngineInterface): Promise<void> {
 	// The PR of the current branch, then refresh what is already listed.
 	await fetchPr($, "", "branch atual").catch(() => {});
@@ -188,12 +206,20 @@ export const register: Register = (on) => {
 			await $.ui.open({ id: PANE, title: `PR #${n}` });
 		};
 
-		return bandView($.ui.resolve(e), {
+		const worktree = await worktreeChanges($);
+		const head =
+			worktree.length > 0
+				? await gitHead($)
+				: { branch: "", isWorktree: false };
+		const view = bandView($.ui.resolve(e), {
 			prs: list,
 			onOpenPr: (n) => void openPr(n),
+			head,
+			worktree,
 			onOpenWorktree: () =>
 				void $.ui.open({ id: WORKTREE_PANE, title: "Alterações da worktree" }),
 		});
+		return view ?? next(e);
 	});
 
 	on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {

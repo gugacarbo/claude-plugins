@@ -4,20 +4,36 @@ import type { Ui } from "../hooks/views";
 
 // A DOM stand-in for the element table `$.ui.resolve(e)` hands the mod, so the
 // views render in Storybook. It mimics the terminal look, not its exact paint.
-const COLORS: Record<string, string> = { green: "#3fb950", red: "#f85149" };
+const COLORS: Record<string, string> = {
+	green: "#3fb950",
+	red: "#f85149",
+	magenta: "#a371f7",
+	gray: "#8b949e",
+};
 
 type BoxProps = {
 	children?: ReactNode;
 	flexDirection?: "row" | "column";
 	gap?: number;
+	justifyContent?: CSSProperties["justifyContent"];
+	width?: number;
 };
-const Box = ({ children, flexDirection = "column", gap = 0 }: BoxProps) => (
+const Box = ({
+	children,
+	flexDirection = "column",
+	gap = 0,
+	justifyContent,
+	width,
+}: BoxProps) => (
 	<div
 		style={{
 			display: "flex",
 			flexDirection,
 			gap: `${gap * 0.5}em`,
-			flexWrap: "wrap",
+			justifyContent,
+			width: width === undefined ? undefined : `${width}ch`,
+			flexShrink: width === undefined ? undefined : 0,
+			flexWrap: flexDirection === "row" ? "nowrap" : "wrap",
 			alignItems: flexDirection === "row" ? "center" : "stretch",
 		}}
 	>
@@ -41,21 +57,39 @@ const Text = ({ children, bold, dimColor, color }: TextProps) => {
 	return <span style={style}>{children}</span>;
 };
 
-const Button = ({ label, onPress }: { label: string; onPress?: () => void }) => (
+// `plain` draws without chrome, as the terminal does; `dimColor` dims it at rest.
+const Button = ({
+	label,
+	children,
+	onPress,
+	plain,
+	dimColor,
+}: {
+	label?: string;
+	children?: ReactNode;
+	onPress?: () => void;
+	plain?: boolean;
+	dimColor?: boolean;
+}) => (
 	<button
 		type="button"
 		onClick={onPress}
 		style={{
 			font: "inherit",
 			color: "inherit",
-			background: "#30363d",
-			border: "1px solid #484f58",
-			borderRadius: 4,
-			padding: "0 0.6em",
 			cursor: "pointer",
+			opacity: dimColor ? 0.6 : undefined,
+			...(plain
+				? { background: "none", border: "none", padding: 0, textAlign: "left" }
+				: {
+						background: "#30363d",
+						border: "1px solid #484f58",
+						borderRadius: 4,
+						padding: "0 0.6em",
+					}),
 		}}
 	>
-		{label}
+		{children ?? label}
 	</button>
 );
 
