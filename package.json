@@ -25,7 +25,9 @@
 		"plugins:install": "bun src/index.ts install",
 		"plugins:update": "bun src/index.ts update",
 		"plugins:status": "bun src/index.ts status",
-		"prepare": "husky"
+		"prepare": "husky",
+		"storybook": "storybook dev -p 6006",
+		"build-storybook": "storybook build"
 	},
 	"lint-staged": {
 		"*.{js,mjs,cjs,ts,tsx}": [
@@ -41,12 +43,31 @@
 		"@commitlint/config-conventional": "^21.2.4",
 		"@cspell/dict-pt-br": "^2.4.4",
 		"@types/bun": "^1.4.4",
+		"@types/react": "^19.3.0",
+		"@types/react-dom": "^19.3.0",
+		"@vitejs/plugin-react": "^6.1.2",
 		"cspell": "^10",
 		"husky": "^9.1.7",
 		"knip": "^6",
 		"lint-staged": "^17.6.0",
 		"prettier": "^3",
 		"prettier-plugin-sh": "^0.20.2",
-		"typescript": "^7.0.2"
+		"typescript": "^7.0.2",
+		"vite": "^8.3.5",
+		"storybook": "^10.6.5",
+		"@storybook/react-vite": "^10.6.5",
+		"@chromatic-com/storybook": "latest",
+		"@storybook/addon-vitest": "^10.6.5",
+		"@storybook/addon-a11y": "^10.6.5",
+		"@storybook/addon-docs": "^10.6.5",
+		"@storybook/addon-mcp": "^10.6.5",
+		"vitest": "latest",
+		"@vitest/browser-playwright": "latest",
+		"@vitest/coverage-v8": "latest",
+		"playwright": "latest"
+	},
+	"dependencies": {
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
 	}
 }

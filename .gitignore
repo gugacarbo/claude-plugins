@@ -6,3 +6,6 @@ plugins/*/.claude-plugin/types/
 
 # logs gerados pelos mods em runtime
 .claude/mods-logs/
+
+*storybook.log
+storybook-static
