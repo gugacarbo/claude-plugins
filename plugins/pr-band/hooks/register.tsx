@@ -4,13 +4,14 @@ import { atom, read, update } from "claude-code";
 import type { Pr } from "../types";
 
 const PANE = "pr-band";
+const WORKTREE_PANE = "pr-band-worktree";
 const prs = atom({ plugin: "pr-band", key: "prs" } as const, [], {
-	shape: "prs-1",
+	shape: "prs-2",
 });
 const selected = atom({ plugin: "pr-band", key: "selected" } as const, null);
 
 const FIELDS =
-	"number,title,url,state,isDraft,author,headRefName,additions,deletions,changedFiles,reviewDecision,statusCheckRollup,body";
+	"number,title,url,state,isDraft,author,headRefName,additions,deletions,changedFiles,reviewDecision,statusCheckRollup,body,files";
 // Links like github.com/owner/repo/pull/12 in prompts or tool output.
 const PR_URL = /github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)/g;
 
@@ -57,6 +58,13 @@ async function fetchPr(
 		additions: raw.additions,
 		deletions: raw.deletions,
 		changedFiles: raw.changedFiles,
+		files: (raw.files ?? []).map(
+			(f: { path: string; additions: number; deletions: number }) => ({
+				path: f.path,
+				additions: f.additions,
+				deletions: f.deletions,
+			}),
+		),
 		review: REVIEW[raw.reviewDecision] ?? "sem review",
 		checks: checksOf(raw.statusCheckRollup),
 		body: (raw.body || "").slice(0, 4000),
@@ -69,6 +77,37 @@ async function fetchPr(
 			? list.map((p) => (p.number === pr.number ? merged : p))
 			: [...list, merged];
 	});
+}
+
+type WorktreeFile = {
+	path: string;
+	status: string;
+	additions: number;
+	deletions: number;
+};
+
+// Changes of the current worktree against HEAD, untracked files included.
+async function worktreeChanges($: EngineInterface): Promise<WorktreeFile[]> {
+	const status = await $.process.run(["git", "status", "--porcelain=v1"], {
+		timeoutMs: 15000,
+	});
+	if (status.exitCode !== 0) return [];
+	const numstat = await $.process.run(["git", "diff", "--numstat", "HEAD"], {
+		timeoutMs: 15000,
+	});
+	const counts = new Map<string, [number, number]>();
+	for (const line of numstat.stdout.split("\n")) {
+		const [add, del, path] = line.split("\t");
+		if (path) counts.set(path, [Number(add) || 0, Number(del) || 0]);
+	}
+	return status.stdout
+		.split("\n")
+		.filter(Boolean)
+		.map((line) => {
+			const path = line.slice(3).replace(/^.* -> /, "");
+			const [additions, deletions] = counts.get(path) ?? [0, 0];
+			return { path, status: line.slice(0, 2).trim(), additions, deletions };
+		});
 }
 
 async function refreshAll($: EngineInterface): Promise<void> {
@@ -153,8 +192,15 @@ export const register: Register = (on) => {
 
 		if (list.length === 0) {
 			return (
-				<Box>
+				<Box flexDirection="row" gap={1}>
 					<Text dimColor>Nenhum PR relacionado a esta conversa</Text>
+					<Button
+						key="worktree"
+						label="Ver alterações da worktree"
+						onPress={() =>
+							$.ui.open({ id: WORKTREE_PANE, title: "Alterações da worktree" })
+						}
+					/>
 				</Box>
 			);
 		}
@@ -198,6 +244,22 @@ export const register: Register = (on) => {
 					Review: {pr.review} · CI: {pr.checks}
 				</Text>
 				<Text dimColor>Relação: {pr.source}</Text>
+				{pr.files.length > 0 && (
+					<Box flexDirection="column">
+						<Text bold>Arquivos alterados</Text>
+						{pr.files.map((f) => (
+							<Text key={`file-${f.path}`}>
+								<Text color="green">+{f.additions}</Text>{" "}
+								<Text color="red">−{f.deletions}</Text> {f.path}
+							</Text>
+						))}
+						{pr.files.length < pr.changedFiles && (
+							<Text dimColor>
+								… e mais {pr.changedFiles - pr.files.length} arquivos
+							</Text>
+						)}
+					</Box>
+				)}
 				<Markdown text={pr.body || "_Sem descrição._"} />
 				<Button
 					key="refresh"
@@ -207,4 +269,34 @@ export const register: Register = (on) => {
 			</Box>
 		);
 	});
+
+	on(
+		"ui.render",
+		{ component: "Pane", requestId: WORKTREE_PANE },
+		async ($, e) => {
+			const { Box, Text } = $.ui.resolve(e);
+			const files = await worktreeChanges($);
+			if (files.length === 0)
+				return <Text dimColor>Nenhuma alteração na worktree.</Text>;
+
+			return (
+				<Box flexDirection="column" gap={1}>
+					<Text bold>
+						{files.length === 1
+							? "1 arquivo alterado"
+							: `${files.length} arquivos alterados`}
+					</Text>
+					<Box flexDirection="column">
+						{files.map((f) => (
+							<Text key={`wt-${f.path}`}>
+								<Text dimColor>{f.status.padEnd(2)}</Text>{" "}
+								<Text color="green">+{f.additions}</Text>{" "}
+								<Text color="red">−{f.deletions}</Text> {f.path}
+							</Text>
+						))}
+					</Box>
+				</Box>
+			);
+		},
+	);
 };

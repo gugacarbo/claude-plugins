@@ -1,3 +1,5 @@
+export type PrFile = { path: string; additions: number; deletions: number }
+
 export type Pr = {
   number: number
   title: string
@@ -9,6 +11,7 @@ export type Pr = {
   additions: number
   deletions: number
   changedFiles: number
+  files: PrFile[]
   review: string
   checks: string
   body: string
