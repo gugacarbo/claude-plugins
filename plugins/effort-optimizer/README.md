@@ -29,6 +29,16 @@ The effort menu next to the model name keeps showing your own setting. The Claud
 - `/effort-optimizer suggest` goes back to the pop-up.
 - `/effort-optimizer off` and `/effort-optimizer on` turn the mod off and on.
 - `/effort-optimizer-usage` mostra o gasto das checagens com o Sonnet: hoje e o histórico (tokens de entrada e saída, tempo e custo estimado pelo preço de tabela da API).
+- `/effort-optimizer-panel` abre na lateral direita um painel com o estado do mod, as configurações (ligar/desligar, modo sugerir/automático, níveis permitidos por modelo) e o gasto com o Sonnet.
+
+## Níveis permitidos por modelo
+
+No painel, a seção **Níveis permitidos por modelo** tem um botão por nível e por família (Opus, Sonnet, Haiku e Outros). Um nível desmarcado nunca é sugerido nem aplicado naquele modelo. Por exemplo: xHigh liberado no Haiku e bloqueado no Opus.
+
+- A escolha da checagem fica dentro dos níveis permitidos; se ela cair num nível bloqueado, o mod usa o permitido mais próximo (o menor, em caso de empate).
+- Com um só nível permitido, o mod usa esse nível sem chamar o Sonnet. Sem nenhum permitido, o mod não age naquele modelo.
+- O mod só limita o que ele mesmo aplica: o nível que você escolhe no menu do app não é alterado.
+- Tudo começa liberado e a escolha fica salva entre sessões.
 
 ## Install
 

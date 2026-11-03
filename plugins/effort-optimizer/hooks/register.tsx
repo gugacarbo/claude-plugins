@@ -11,18 +11,28 @@ const SHORT = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'XHigh', max:
 const LEVELS: readonly Level[] = ['low', 'medium', 'high', 'xhigh', 'max']
 const NAMES: Record<Level, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
 
+const FAMILIES: readonly Family[] = ['opus', 'sonnet', 'haiku', 'other']
+const FAMILY_NAMES: Record<Family, string> = { opus: 'Opus', sonnet: 'Sonnet', haiku: 'Haiku', other: 'Outros' }
+
 const APPLIED_MS = 15000
 const ACCENT = '#d97757'
 const GOOD = '#16a34a'
 const BAD = '#dc2626'
 
 type Mode = 'suggest' | 'auto'
+type Family = 'opus' | 'sonnet' | 'haiku' | 'other'
 type Pick = { level: Level; why: string }
 
 // Module variables reset on a reload; the band and the override live in $.state.
 let home = ''
 let enabled = true
 let mode: Mode = 'suggest'
+// The levels the mod may suggest or apply, per model family. Everything is allowed until the person says otherwise.
+let allowed: Record<Family, Level[]> = allAllowed()
+// The model of the main chat's last request.
+let lastModel = ''
+// The family tab the panel shows; the family in use until a tab is pressed.
+let panelFamily: Family | null = null
 // Bumped on every prompt, so a slow pick for an older prompt is dropped.
 let gen = 0
 let nextId = 1
@@ -82,6 +92,38 @@ async function getBand($: EngineInterface): Promise<Band | null> {
 
 async function setBand($: EngineInterface, b: Band | null) {
   await $.state.set(BAND, b)
+}
+
+function allAllowed(): Record<Family, Level[]> {
+  return { opus: [...LEVELS], sonnet: [...LEVELS], haiku: [...LEVELS], other: [...LEVELS] }
+}
+
+// Reads what the store kept; anything unknown or malformed counts as all levels allowed.
+function parseAllowed(raw: unknown): Record<Family, Level[]> {
+  const out = allAllowed()
+  if (!raw || typeof raw !== 'object') return out
+  for (const f of FAMILIES) {
+    const v = (raw as Record<string, unknown>)[f]
+    if (Array.isArray(v)) out[f] = LEVELS.filter(l => v.includes(l))
+  }
+  return out
+}
+
+function familyOf(model: string): Family {
+  const m = model.toLowerCase()
+  if (m.includes('opus')) return 'opus'
+  if (m.includes('sonnet')) return 'sonnet'
+  if (m.includes('haiku')) return 'haiku'
+  return 'other'
+}
+
+// The allowed level nearest to `level` (the lower one on a tie), or null when the family allows none.
+function clamp(level: Level, family: Family): Level | null {
+  const ok = allowed[family]
+  if (ok.length === 0) return null
+  if (ok.includes(level)) return level
+  const at = (l: Level) => LEVELS.indexOf(l)
+  return [...ok].sort((a, b) => Math.abs(at(a) - at(level)) - Math.abs(at(b) - at(level)) || at(a) - at(b))[0] ?? null
 }
 
 // "Extra high", "x-high" and "xhigh" all read as xhigh.
@@ -175,7 +217,7 @@ function lastAssistantText(messages: readonly SessionMessage[]) {
 }
 
 // Ben's framework from the effort levels video: four questions, stop at the first yes.
-function pickPrompt(text: string, lastReply: string, now: Level | '') {
+function pickPrompt(text: string, lastReply: string, now: Level | '', allow: readonly Level[]) {
   return `You pick the effort level an AI assistant (Claude) should use for one prompt. Effort sets how much time, reading and checking Claude spends, and how many decisions it makes alone. It is not how smart Claude is.
 
 Ask these four questions in this order and stop at the first yes:
@@ -192,6 +234,7 @@ A task being long does not make it high. Rule-following work stays low or medium
 If the prompt only approves, answers a question, or says to go on with earlier work (yes, go, ok, do it, option 2), answer keep.
 
 The chat runs at: ${now || 'unknown'}
+Only these levels are allowed for this model: ${allow.join(', ')}. Never answer a level outside this list; when the best level is not allowed, answer the closest allowed one.
 
 Claude's last reply (first 600 characters, for context):
 <reply>
@@ -219,13 +262,17 @@ function parsePick(text: string): Pick | null {
   }
 }
 
-async function pick($: EngineInterface, text: string, now: Level | ''): Promise<Pick | null> {
+async function pick($: EngineInterface, text: string, now: Level | '', family: Family): Promise<Pick | null> {
+  const allow = allowed[family]
+  // Nothing allowed: the mod stays out. One level allowed: nothing to choose.
+  if (allow.length === 0) return null
+  if (allow.length === 1) return { level: allow[0]!, why: 'o único nível permitido neste modelo' }
   const messages = await $.session.messages()
   const lastReply = lastAssistantText(messages).slice(0, 600)
   const startedAt = await $.clock.now()
   const r = await $.model.complete({
     model: 'claude-sonnet-5-5',
-    prompt: pickPrompt(text.slice(0, 4000), lastReply, now),
+    prompt: pickPrompt(text.slice(0, 4000), lastReply, now, allow),
     maxTokens: 120,
     effort: 'low',
     timeoutMs: 20_000,
@@ -233,7 +280,10 @@ async function pick($: EngineInterface, text: string, now: Level | ''): Promise<
   const ms = Math.max(0, (await $.clock.now()) - startedAt)
   if ('usage' in r) await recordUsage($, r.usage, ms, r.isAnswered).catch(err => log($, 'usage', err))
   if (!r.isAnswered) throw new Error(`pick failed: ${r.reason}`)
-  return parsePick(r.text)
+  const p = parsePick(r.text)
+  if (!p) return null
+  const level = clamp(p.level, family)
+  return level ? { ...p, level } : null
 }
 
 // Claude Sonnet 5.5 list prices, USD per million tokens; a 5 minute cache write costs 1.25x input.
@@ -329,12 +379,12 @@ async function showApplied($: EngineInterface, p: Pick, from: Level | '', note: 
 }
 
 // Suggest mode: pick before the prompt goes in and, when the level differs, hold the prompt until the person answers.
-async function suggest($: EngineInterface, text: string, mine: number) {
+async function suggest($: EngineInterface, text: string, mine: number, family: Family) {
   const now = await currentLevel($)
   await $.state.set(CHECKING, 'checking effort…').catch(() => undefined)
   let p: Pick | null = null
   try {
-    p = await pick($, text, now)
+    p = await pick($, text, now, family)
   } finally {
     await $.state.set(CHECKING, null).catch(() => undefined)
   }
@@ -362,11 +412,11 @@ async function suggest($: EngineInterface, text: string, mine: number) {
 }
 
 // Auto mode: pick before the prompt goes in, so the first request already runs at the right level.
-async function autoAdjust($: EngineInterface, text: string, mine: number) {
+async function autoAdjust($: EngineInterface, text: string, mine: number, family: Family) {
   const now = await currentLevel($)
   await $.state.set(CHECKING, 'picking effort…').catch(() => undefined)
   try {
-    const p = await pick($, text, now)
+    const p = await pick($, text, now, family)
     if (!p || mine !== gen) return
     if (p.level === now) {
       turnLevel = p.level
@@ -379,9 +429,19 @@ async function autoAdjust($: EngineInterface, text: string, mine: number) {
   }
 }
 
+const PANEL = 'effort-optimizer-panel'
+
+async function openPanel($: EngineInterface) {
+  return $.ui.open({ id: PANEL, title: 'Effort Optimizer', focus: true })
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     home = $.plugin.root.split('/.claude/')[0] ?? ''
+    await $.command.register({
+      name: 'effort-optimizer-panel',
+      description: 'Effort Optimizer: abre o painel lateral com informações e configurações',
+    })
     await $.command.register({
       name: 'effort-optimizer',
       description: 'Effort Optimizer. auto: set effort by itself. suggest: offer a switch. off or on',
@@ -393,6 +453,7 @@ export const register: Register = on => {
     })
     enabled = (await $.store.get('enabled')) !== false
     mode = (await $.store.get('mode')) === 'auto' ? 'auto' : 'suggest'
+    allowed = parseAllowed(await $.store.get('allowed'))
     await readSwitch($).catch(() => undefined)
     $.clock.every(3000, () => {
       void readSwitch($).catch(() => undefined)
@@ -423,7 +484,9 @@ export const register: Register = on => {
 
   // Every main-chat request: note its level, and put the chosen one on it when the setting could not be changed.
   on('turn.step', async function* ($, e, next) {
+    if (e.agentId === undefined) lastModel = e.model
     if (off || e.agentId !== undefined || typeof e.effort !== 'string') return yield* next(e)
+    const family = familyOf(e.model)
     lastEffort = e.effort
     // The picker moved (by hand, or /effort landed): the mod lets go.
     if (hold && e.effort !== hold.base) { hold = null; turnLevel = null }
@@ -437,11 +500,13 @@ export const register: Register = on => {
     if (held && e.index === 0 && enabled) {
       const h = held
       held = null
-      if (mode === 'auto') await autoAdjust($, h.text, h.mine).catch(err => log($, 'auto', err))
-      else await suggest($, h.text, h.mine).catch(err => log($, 'suggest', err))
+      if (mode === 'auto') await autoAdjust($, h.text, h.mine, family).catch(err => log($, 'auto', err))
+      else await suggest($, h.text, h.mine, family).catch(err => log($, 'suggest', err))
       value = enabled && hold ? hold.level : null
     }
-    const want = turnLevel ?? (enabled ? (value ?? null) : null)
+    // Whatever the mod holds still has to be a level this model allows.
+    const wanted = turnLevel ?? (enabled ? (value ?? null) : null)
+    const want = wanted ? clamp(wanted, family) : null
     if (!want || want === e.effort) return yield* next(e)
     void log($, 'request', `${e.effort} -> ${want}`)
     return yield* next({ ...e, effort: want })
@@ -478,6 +543,7 @@ export const register: Register = on => {
       text: [
         `Effort Optimizer is ${enabled ? 'on' : 'off'}, mode: ${mode}.`,
         `This chat runs at: ${now ? NAMES[now] : 'unknown yet'}${value ? ` (held by the mod: ${NAMES[value]})` : ''}.`,
+        `Allowed levels (${FAMILY_NAMES[familyOf(lastModel)]}): ${allowed[familyOf(lastModel)].map(l => NAMES[l]).join(', ') || 'none'}.`,
         `Effort setting: ${rowKey || 'not found, the mod sets the level on each request'}.`,
         'Type /effort-optimizer auto, suggest, off or on.',
       ].join('\n'),
@@ -499,6 +565,226 @@ export const register: Register = on => {
         fmtTotals(u.total),
       ].join('\n'),
     }
+  })
+
+  on('command.run', { command: 'effort-optimizer-panel' }, async $ => {
+    const r = await openPanel($)
+    return {
+      text: r.isPlaced
+        ? 'Painel do Effort Optimizer aberto.'
+        : 'O painel está aberto, mas a janela é estreita demais para mostrá-lo agora. Aumente a janela.',
+    }
+  })
+
+  on('ui.render', { component: 'Pane', requestId: PANEL }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const now = await currentLevel($)
+    const { value: held } = await $.state.get(OVERRIDE)
+    const u = await readUsage($)
+    const today = u.days[dayKey(await $.clock.now())] ?? emptyTotals()
+    const recent = u.calls.slice(-5).reverse()
+    const isOn = enabled && !off
+    const inUse = lastModel ? familyOf(lastModel) : null
+    const shown: Family = panelFamily ?? inUse ?? 'opus'
+    const set = (fn: () => Promise<void>) => () =>
+      void fn()
+        .then(() => redraw($))
+        .catch(err => log($, 'panel', err))
+    const n = (v: number) => v.toLocaleString('pt-BR')
+
+    const card = (title: string, children: unknown) => (
+      <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} gap={1}>
+        <Text dimColor bold>{title.toUpperCase()}</Text>
+        {children}
+      </Box>
+    )
+    const field = (label: string, hint: string, controls: unknown) => (
+      <Box flexDirection="column">
+        <Box flexDirection="row" justifyContent="space-between" gap={2}>
+          <Text bold>{label}</Text>
+          {controls}
+        </Box>
+        <Text dimColor>{hint}</Text>
+      </Box>
+    )
+    // One label column and one or two right-aligned number columns, so the figures line up.
+    const same = today.calls === u.total.calls
+    const cell = (text: string, dim = false) => (
+      <Box width="22%" justifyContent="flex-end">
+        <Text dimColor={dim}>{text}</Text>
+      </Box>
+    )
+    const row = (label: string, a: string, b: string) => (
+      <Box flexDirection="row">
+        <Box flexGrow={1}>
+          <Text dimColor>{label}</Text>
+        </Box>
+        {same ? cell(a) : [cell(a), cell(b, true)]}
+      </Box>
+    )
+    const avg = (t: UsageTotals) => (t.calls ? `${(t.ms / t.calls / 1000).toFixed(1)} s` : '-')
+    const levelsAllowed = allowed[shown].length
+
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Box flexDirection="row" justifyContent="space-between">
+          <Text>
+            <Text color={ACCENT}>●</Text>
+            <Text bold> Effort Optimizer</Text>
+          </Text>
+          <Text color={isOn ? GOOD : BAD}>{off ? 'desligado no /mods' : isOn ? '● ligado' : '○ desligado'}</Text>
+        </Box>
+
+        {card(
+          'Agora',
+          <Box flexDirection="column">
+            <Text>
+              <Text bold color={now ? ACCENT : undefined} dimColor={!now}>
+                {now ? NAMES[now] : 'Nível ainda desconhecido'}
+              </Text>
+              {now && held ? <Text dimColor> · mantido pelo mod</Text> : null}
+            </Text>
+            <Text dimColor>
+              {lastModel ? `Modelo: ${lastModel}` : 'O modelo e o nível aparecem depois do próximo prompt.'}
+            </Text>
+          </Box>,
+        )}
+
+        {card(
+          'Configurações',
+          <Box flexDirection="column" gap={1}>
+            {field(
+              'Estado',
+              'Desligado, o mod deixa o effort como você escolheu.',
+              <Box flexDirection="row" gap={1}>
+                <Button
+                  key="on"
+                  label="Ligado"
+                  variant={enabled ? 'primary' : 'secondary'}
+                  onPress={set(async () => {
+                    enabled = true
+                    await $.store.set('enabled', true)
+                  })}
+                />
+                <Button
+                  key="off"
+                  label="Desligado"
+                  variant={enabled ? 'secondary' : 'primary'}
+                  onPress={set(async () => {
+                    enabled = false
+                    turnLevel = null
+                    await $.store.set('enabled', false)
+                    await $.state.set(OVERRIDE, null)
+                    await setBand($, null)
+                  })}
+                />
+              </Box>,
+            )}
+            {field(
+              'Modo',
+              mode === 'auto' ? 'Troca o nível sozinho a cada prompt.' : 'Pergunta antes de trocar o nível.',
+              <Box flexDirection="row" gap={1}>
+                <Button
+                  key="suggest"
+                  label="Sugerir"
+                  variant={mode === 'suggest' ? 'primary' : 'secondary'}
+                  onPress={set(async () => {
+                    mode = 'suggest'
+                    await $.store.set('mode', mode)
+                  })}
+                />
+                <Button
+                  key="auto"
+                  label="Automático"
+                  variant={mode === 'auto' ? 'primary' : 'secondary'}
+                  onPress={set(async () => {
+                    mode = 'auto'
+                    await $.store.set('mode', mode)
+                  })}
+                />
+              </Box>,
+            )}
+          </Box>,
+        )}
+
+        {card(
+          'Níveis permitidos',
+          <Box flexDirection="column" gap={1}>
+            <Box flexDirection="row" gap={1}>
+              {FAMILIES.map(f => (
+                <Button
+                  key={`tab:${f}`}
+                  label={`${FAMILY_NAMES[f]}${f === inUse ? ' •' : ''}`}
+                  variant={f === shown ? 'primary' : 'secondary'}
+                  onPress={set(async () => {
+                    panelFamily = f
+                  })}
+                />
+              ))}
+            </Box>
+            <Box flexDirection="row" gap={1}>
+              {LEVELS.map(level => {
+                const isAllowed = allowed[shown].includes(level)
+                return (
+                  <Button
+                    key={`allow:${shown}:${level}`}
+                    label={`${isAllowed ? '✓' : '✕'} ${SHORT[level]}`}
+                    variant={isAllowed ? 'primary' : 'secondary'}
+                    onPress={set(async () => {
+                      allowed = {
+                        ...allowed,
+                        [shown]: LEVELS.filter(l => (l === level ? !isAllowed : allowed[shown].includes(l))),
+                      }
+                      await $.store.set('allowed', allowed)
+                    })}
+                  />
+                )
+              })}
+            </Box>
+            <Text color={levelsAllowed === 0 ? BAD : undefined} dimColor={levelsAllowed > 0}>
+              {levelsAllowed === 0
+                ? `${FAMILY_NAMES[shown]}: nenhum nível permitido, o mod não age nesse modelo.`
+                : `${FAMILY_NAMES[shown]}: ${levelsAllowed} de ${LEVELS.length} níveis permitidos.${shown === inUse ? ' É o modelo em uso.' : ''}`}
+            </Text>
+          </Box>,
+        )}
+
+        {card(
+          'Gasto com o Sonnet 5.5',
+          <Box flexDirection="column">
+            <Box flexDirection="row">
+              <Box flexGrow={1} />
+              {same ? cell('Hoje e total') : [cell('Hoje'), cell('Total', true)]}
+            </Box>
+            {row('Checagens', n(today.calls), n(u.total.calls))}
+            {row('Custo estimado', fmtUsd(today.usd), fmtUsd(u.total.usd))}
+            {row('Tokens de entrada', n(today.input), n(u.total.input))}
+            {row('Tokens de saída', n(today.output), n(u.total.output))}
+            {row('Tempo médio', avg(today), avg(u.total))}
+            {u.total.failed ? <Text color={BAD}>{u.total.failed} checagens falharam</Text> : null}
+          </Box>,
+        )}
+
+        {recent.length > 0
+          ? card(
+              'Últimas checagens',
+              <Box flexDirection="column">
+                {recent.map(c => (
+                  <Box flexDirection="row" justifyContent="space-between" gap={2}>
+                    <Text dimColor>{new Date(c.at).toLocaleTimeString('pt-BR')}</Text>
+                    <Text color={c.ok ? undefined : BAD}>
+                      {(c.ms / 1000).toFixed(1)} s · {fmtUsd(c.usd)}
+                      {c.ok ? '' : ' · falhou'}
+                    </Text>
+                  </Box>
+                ))}
+              </Box>,
+            )
+          : null}
+
+        <Text dimColor>/effort-optimizer · /effort-optimizer-usage · /effort-optimizer-panel</Text>
+      </Box>
+    )
   })
 
   on('ui.press', { plugin: 'effort-optimizer', element: 'switch' }, async ($, e) => {
