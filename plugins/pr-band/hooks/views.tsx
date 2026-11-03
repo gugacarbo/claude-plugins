@@ -1,75 +1,24 @@
-import type { EngineInterface } from "claude-code";
+import { imagesView, tabsView } from "./ui-shared/components";
+import { isImage, truncate, worktreeSummary } from "./ui-shared/helpers";
+import type {
+	ChangedImage,
+	GitHead,
+	Ui,
+	WorktreeFile,
+} from "./ui-shared/types";
+
+export { isImage, worktreeSummary } from "./ui-shared/helpers";
+export type {
+	ChangedImage,
+	GitHead,
+	Picture,
+	Ui,
+	WorktreeFile,
+} from "./ui-shared/types";
 
 import type { Pr } from "../types";
 
-// The element table each view draws with: `$.ui.resolve(e)` in the mod, a DOM
-// table in Storybook.
-export type Ui = Pick<
-	ReturnType<EngineInterface["ui"]["resolve"]>,
-	"Box" | "Text" | "Button" | "Link" | "Markdown"
-> & {
-	// Desktop, the editor and mobile draw it; the terminal has none.
-	Svg?: (props: {
-		source: string;
-		alt: string;
-		width?: number;
-		height?: number;
-	}) => ReturnType<Ui["Text"]>;
-};
-
 export type PaneTab = "files" | "images";
-
-// One side of a changed image: its bytes as a data URI, or why it is not shown.
-export type Picture = { uri: string } | { missing: string };
-
-export type ChangedImage = {
-	path: string;
-	status: "added" | "modified" | "deleted";
-	before?: Picture;
-	after?: Picture;
-};
-
-const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i;
-
-export function isImage(path: string) {
-	return IMAGE_EXT.test(path);
-}
-
-// Where the session is: the branch name, and whether the checkout is a linked
-// worktree (`git worktree add`) rather than the main one.
-export type GitHead = { branch: string; isWorktree: boolean };
-
-export type WorktreeFile = {
-	path: string;
-	status: string;
-	additions: number;
-	deletions: number;
-};
-
-// Statuses come from `git status --porcelain`: "A"/"??" added, "D" deleted.
-export function worktreeSummary(files: WorktreeFile[]) {
-	const s = {
-		files: files.length,
-		modified: 0,
-		added: 0,
-		deleted: 0,
-		additions: 0,
-		deletions: 0,
-	};
-	for (const f of files) {
-		const st = f.status.trim();
-		if (st.startsWith("A") || st === "??") s.added++;
-		else if (st.startsWith("D")) s.deleted++;
-		else s.modified++;
-		s.additions += f.additions;
-		s.deletions += f.deletions;
-	}
-	return s;
-}
-
-function truncate(text: string, max: number) {
-	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
-}
 
 // The status dot's color: open, draft, merged or closed.
 function prColor(pr: Pr): string {
@@ -254,89 +203,6 @@ export function worktreePaneView(
 					))}
 				</Box>
 			)}
-		</Box>
-	);
-}
-
-export function tabsView(
-	{ Box, Button }: Ui,
-	props: { tab: PaneTab; images: number; onSelect: (tab: PaneTab) => void },
-) {
-	const { tab, images, onSelect } = props;
-	return (
-		<Box flexDirection="row" gap={1}>
-			<Button
-				key="tab-files"
-				label="Arquivos"
-				variant={tab === "files" ? "primary" : "secondary"}
-				onPress={() => onSelect("files")}
-			/>
-			<Button
-				key="tab-images"
-				label={`Imagens (${images})`}
-				variant={tab === "images" ? "primary" : "secondary"}
-				onPress={() => onSelect("images")}
-			/>
-		</Box>
-	);
-}
-
-const BOX_W = 260;
-const BOX_H = 180;
-
-function pictureView(
-	{ Box, Text, Svg }: Ui,
-	label: string,
-	pic: Picture | undefined,
-	alt: string,
-) {
-	if (!pic) return null;
-	return (
-		<Box flexDirection="column">
-			<Text dimColor>{label}</Text>
-			{"missing" in pic ? (
-				<Text dimColor>{pic.missing}</Text>
-			) : Svg ? (
-				<Svg
-					source={`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BOX_W} ${BOX_H}" width="${BOX_W}" height="${BOX_H}"><image href="${pic.uri}" width="${BOX_W}" height="${BOX_H}" preserveAspectRatio="xMidYMid meet"/></svg>`}
-					alt={alt}
-					width={BOX_W}
-					height={BOX_H}
-				/>
-			) : (
-				<Text dimColor>(imagem não exibida no terminal)</Text>
-			)}
-		</Box>
-	);
-}
-
-const STATUS_LABEL = {
-	added: ["green", "adicionada"],
-	modified: ["yellow", "alterada"],
-	deleted: ["red", "removida"],
-} as const;
-
-export function imagesView(ui: Ui, images: ChangedImage[] | undefined) {
-	const { Box, Text } = ui;
-	if (!images) return <Text dimColor>Carregando imagens…</Text>;
-	if (images.length === 0)
-		return <Text dimColor>Nenhuma imagem alterada.</Text>;
-	return (
-		<Box flexDirection="column" gap={1}>
-			{images.map((img) => {
-				const [color, label] = STATUS_LABEL[img.status];
-				return (
-					<Box key={`img-${img.path}`} flexDirection="column">
-						<Text>
-							<Text color={color}>{label}</Text> {img.path}
-						</Text>
-						<Box flexDirection="row" gap={2}>
-							{pictureView(ui, "antes", img.before, `${img.path}, antes`)}
-							{pictureView(ui, "depois", img.after, `${img.path}, depois`)}
-						</Box>
-					</Box>
-				);
-			})}
 		</Box>
 	);
 }

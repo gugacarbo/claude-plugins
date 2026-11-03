@@ -1,8 +1,7 @@
+import { domUi, Terminal } from "@claude-plugins/ui/storybook";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
-
 import { prPaneView, worktreePaneView } from "../hooks/views";
-import { domUi, Terminal } from "./dom-ui";
 import { images, pr, worktree } from "./fixtures";
 
 type PrArgs = Parameters<typeof prPaneView>[1];

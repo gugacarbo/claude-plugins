@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	type InstalledPlugin,
 	type KnownMarketplace,
@@ -6,9 +7,10 @@ import {
 	parseArgs,
 	plan,
 } from "./plan";
+import { syncUiToPlugins } from "./sync-ui";
 
 const REPO = "gugacarbo/claude-plugins";
-const ROOT = join(import.meta.dir, "..");
+const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function claude(args: string[]): Promise<string> {
 	const proc = Bun.spawn(["claude", ...args], {
@@ -43,6 +45,14 @@ async function main(): Promise<void> {
 			);
 		}
 		return;
+	}
+
+	if (!dryRun) {
+		const sync = await syncUiToPlugins();
+		if (sync.plugins.length > 0)
+			process.stdout.write(
+				`Sincronizei packages/ui para ${sync.plugins.join(", ")} (${sync.files} arquivo${sync.files === 1 ? "" : "s"}).\n`,
+			);
 	}
 
 	const steps = plan(

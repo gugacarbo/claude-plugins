@@ -1,0 +1,17 @@
+{
+	"name": "@claude-plugins/ui",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		"./types": "./src/types.ts",
+		"./helpers": "./src/helpers.ts",
+		"./components": "./src/components.tsx",
+		"./themes": "./src/themes.ts",
+		"./storybook": "./src/storybook.tsx"
+	},
+	"peerDependencies": {
+		"react": "^19.3.1",
+		"react-dom": "^19.3.1"
+	}
+}

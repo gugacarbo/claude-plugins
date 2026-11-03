@@ -47,6 +47,27 @@ src/
 - `plugins/pr-band/.claude-plugin/types/` é gerado pelo Claude Code ao carregar o mod e não é
   versionado. O `tsc` da raiz cobre só `src/`; valide o mod com `claude plugin validate`.
 
+## packages/ui — componentes e helpers de UI compartilhados
+
+Fonte canônica de UI entre os plugins. O Claude Code restringe os imports dos hooks a
+arquivos próprios do plugin (relativos) e ao módulo `claude-code`, então o pacote não
+pode ser importado direto com `@claude-plugins/ui/...` dentro dos hooks. O caminho é codegen:
+
+- `packages/ui/src/` — fonte: `types.ts` (tipos estruturais `Ui`, `ChangedImage`, `WorktreeFile`, etc.),
+  `helpers.ts` (`truncate`, `isImage`, `worktreeSummary`), `components.tsx`
+  (`tabsView`, `imagesView`, `pictureView`), `themes.ts` (paleta `COLORS`),
+  `storybook.tsx` (`domUi` DOM stand-in + `Terminal` para stories).
+- `src/sync-ui.ts` copia `packages/ui/src/` para `plugins/<nome>/hooks/ui-shared/`
+  antes de cada `install`/`update` (`bun run plugins:install` / `plugins:update` o chama).
+  A cópia é idempotente (só reescreve se o conteúdo mudou) e exclui `storybook.tsx`
+  (só faz sentido em stories, não em runtime de mod).
+- Os hooks do plugin importam de `./ui-shared/...` — caminho relativo interno, aceito pelo
+  runtime e pelo `claude plugin validate`. Ex.: `import { isImage, tabsView } from "./ui-shared/components"`.
+- O Storybook da raíz consome direto `packages/ui/src/storybook.tsx` (sem sync).
+
+Para usar um helper num plugin novo: importe de `./ui-shared/` nos hooks e rode
+`bun run plugins:update` para gerar a pasta.
+
 ## Convenções
 
 - Textos e saídas em português; código em inglês.

@@ -1,15 +1,10 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { Ui } from "../hooks/views";
+import { resolveColor } from "./themes";
+import type { Ui } from "./types";
 
 // A DOM stand-in for the element table `$.ui.resolve(e)` hands the mod, so the
 // views render in Storybook. It mimics the terminal look, not its exact paint.
-const COLORS: Record<string, string> = {
-	green: "#3fb950",
-	red: "#f85149",
-	magenta: "#a371f7",
-	gray: "#8b949e",
-};
 
 type BoxProps = {
 	children?: ReactNode;
@@ -18,6 +13,7 @@ type BoxProps = {
 	justifyContent?: CSSProperties["justifyContent"];
 	width?: number;
 };
+
 const Box = ({
 	children,
 	flexDirection = "column",
@@ -47,11 +43,12 @@ type TextProps = {
 	dimColor?: boolean;
 	color?: string;
 };
+
 const Text = ({ children, bold, dimColor, color }: TextProps) => {
 	const style: CSSProperties = {
 		fontWeight: bold ? 700 : undefined,
 		opacity: dimColor ? 0.6 : undefined,
-		color: color ? (COLORS[color] ?? color) : undefined,
+		color: color ? resolveColor(color) : undefined,
 		whiteSpace: "pre-wrap",
 	};
 	return <span style={style}>{children}</span>;
@@ -104,11 +101,33 @@ const Markdown = ({ text }: { text: string }) => (
 );
 
 // The desktop draws an Svg as an image.
-const Svg = ({ source, alt, width, height }: { source: string; alt: string; width?: number; height?: number }) => (
-	<img src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`} alt={alt} width={width} height={height} />
+const Svg = ({
+	source,
+	alt,
+	width,
+	height,
+}: {
+	source: string;
+	alt: string;
+	width?: number;
+	height?: number;
+}) => (
+	<img
+		src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`}
+		alt={alt}
+		width={width}
+		height={height}
+	/>
 );
 
-export const domUi = { Box, Text, Button, Link, Markdown, Svg } as unknown as Ui;
+export const domUi = {
+	Box,
+	Text,
+	Button,
+	Link,
+	Markdown,
+	Svg,
+} as unknown as Ui;
 
 export const Terminal = ({ children }: { children: ReactNode }) => (
 	<div

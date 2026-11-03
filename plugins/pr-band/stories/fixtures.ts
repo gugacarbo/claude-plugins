@@ -1,5 +1,5 @@
+import type { ChangedImage, WorktreeFile } from "@claude-plugins/ui/types";
 import type { Pr } from "../types";
-import type { ChangedImage, WorktreeFile } from "../hooks/views";
 
 export const pr: Pr = {
 	number: 42,
