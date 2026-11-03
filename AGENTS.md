@@ -6,6 +6,7 @@ Marketplace pessoal de plugins do Claude Code (`gugacarbo-plugins`).
 
 ```
 .claude-plugin/marketplace.json   # lista dos plugins do marketplace
+.agents/skills/                   # skills oficiais do plugin-dev (Anthropic) p/ instruir agentes
 plugins/
   pr-band/                        # mod só código: faixa acima do prompt + painel lateral
   effort-optimizer/               # mod de terceiros (Ben AI): escolhe o effort de cada prompt
