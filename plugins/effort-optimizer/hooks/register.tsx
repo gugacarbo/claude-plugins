@@ -189,6 +189,14 @@ async function applyLevel($: EngineInterface, level: Level) {
   return ''
 }
 
+// Gives the effort back to the person's own setting.
+async function releaseLevel($: EngineInterface) {
+  hold = null
+  turnLevel = null
+  await $.state.set(OVERRIDE, null)
+  redraw($)
+}
+
 function redraw($: EngineInterface) {
   try {
     $.ui.invalidate('ui.render')
@@ -443,6 +451,11 @@ export const register: Register = on => {
       description: 'Effort Optimizer: abre o painel lateral com informações e configurações',
     })
     await $.command.register({
+      name: 'effort-optimizer-level',
+      description: 'Effort Optimizer: define o nível de effort direto (ou default para voltar ao seu padrão)',
+      argumentHint: '[low|medium|high|xhigh|max|default]',
+    })
+    await $.command.register({
       name: 'effort-optimizer',
       description: 'Effort Optimizer. auto: set effort by itself. suggest: offer a switch. off or on',
       argumentHint: '[auto|suggest|off|on]',
@@ -567,6 +580,24 @@ export const register: Register = on => {
     }
   })
 
+  on('command.run', { command: 'effort-optimizer-level' }, async ($, e) => {
+    const arg = e.args.trim().toLowerCase()
+    const usage = 'Uso: /effort-optimizer-level low|medium|high|xhigh|max|default'
+    if (!arg) return { text: usage }
+    if (arg === 'default' || arg === 'padrao' || arg === 'padrão') {
+      await releaseLevel($)
+      return { text: 'Effort: voltou ao seu padrão.' }
+    }
+    const level = asLevel(arg)
+    if (!level) return { text: `Nível desconhecido: ${arg}. ${usage}` }
+    const chosen = clamp(level, familyOf(lastModel))
+    if (!chosen) return { text: 'Nenhum nível permitido para este modelo (veja o painel).' }
+    await applyLevel($, chosen)
+    return {
+      text: chosen === level ? `Effort: ${NAMES[chosen]}.` : `Effort: ${NAMES[chosen]} (${NAMES[level]} não é permitido neste modelo).`,
+    }
+  })
+
   on('command.run', { command: 'effort-optimizer-panel' }, async $ => {
     const r = await openPanel($)
     return {
@@ -647,6 +678,27 @@ export const register: Register = on => {
             <Text dimColor>
               {lastModel ? `Modelo: ${lastModel}` : 'O modelo e o nível aparecem depois do próximo prompt.'}
             </Text>
+            <Box flexDirection="row" gap={1}>
+              {allowed[inUse ?? 'other'].map(level => (
+                <Button
+                  key={`now:${level}`}
+                  label={NAMES[level]}
+                  variant={held === level || (!held && now === level) ? 'primary' : 'secondary'}
+                  onPress={set(async () => {
+                    await applyLevel($, level)
+                  })}
+                />
+              ))}
+              <Button
+                key="now:default"
+                label="Meu padrão"
+                variant="secondary"
+                onPress={set(async () => {
+                  await releaseLevel($)
+                })}
+              />
+            </Box>
+            <Text dimColor>Escolha um nível para este chat, ou Meu padrão para voltar ao seletor do app.</Text>
           </Box>,
         )}
 

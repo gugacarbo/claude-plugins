@@ -62,7 +62,11 @@ export function imagesView(ui: Ui, images: ChangedImage[] | undefined) {
 
 export function tabsView(
 	{ Box, Button }: Ui,
-	props: { tab: "files" | "images"; images: number; onSelect: (tab: "files" | "images") => void },
+	props: {
+		tab: "files" | "images";
+		images: number;
+		onSelect: (tab: "files" | "images") => void;
+	},
 ) {
 	const { tab, images, onSelect } = props;
 	return (
