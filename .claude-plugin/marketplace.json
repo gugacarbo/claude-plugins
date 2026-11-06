@@ -13,6 +13,11 @@
       "name": "effort-optimizer",
       "source": "./plugins/effort-optimizer",
       "description": "Escolhe o nível de effort de cada prompt (framework de quatro perguntas do Ben AI) e sugere ou aplica a troca (só código)."
+    },
+    {
+      "name": "coding-plan-usage",
+      "source": "./plugins/coding-plan-usage",
+      "description": "Abre num painel lateral o consumo do plano, lido de ~/scripts/commands/coding-plan-usage (só código)."
     }
   ]
 }

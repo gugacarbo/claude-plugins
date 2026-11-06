@@ -1,0 +1,9 @@
+{
+  "name": "coding-plan-usage",
+  "version": "0.1.0",
+  "description": "Abre num painel lateral o consumo do plano, lido de ~/scripts/commands/coding-plan-usage.",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Gustavo Carbonera"
+  }
+}

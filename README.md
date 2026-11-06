@@ -2,9 +2,10 @@
 
 Marketplace pessoal de plugins do Claude Code.
 
-| Plugin    | O que faz                                                                                                  |
-| --------- | ---------------------------------------------------------------------------------------------------------- |
-| `pr-band` | Mod só código: faixa acima do prompt com os PRs relacionados; ao clicar, abre o resumo num painel lateral. |
+| Plugin              | O que faz                                                                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `pr-band`           | Mod só código: faixa acima do prompt com os PRs relacionados; ao clicar, abre o resumo num painel lateral.                     |
+| `coding-plan-usage` | Mod só código: `/coding-plan-usage` abre num painel lateral o consumo do plano lido de `~/scripts/commands/coding-plan-usage`. |
 
 ## Instalar ou atualizar
 
