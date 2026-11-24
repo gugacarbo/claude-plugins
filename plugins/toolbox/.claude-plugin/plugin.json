@@ -1,0 +1,9 @@
+{
+  "name": "toolbox",
+  "version": "0.2.1",
+  "description": "Ícone de ferramentas acima do prompt que expande os atalhos dos painéis dos plugins (lot-map, effort-optimizer).",
+  "types": "./types/index.d.ts",
+  "author": {
+    "name": "Gustavo Carbonera"
+  }
+}
