@@ -2,10 +2,10 @@
 
 Marketplace pessoal de plugins do Claude Code.
 
-| Plugin              | O que faz                                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `pr-band`           | Mod só código: faixa acima do prompt com os PRs relacionados; ao clicar, abre o resumo num painel lateral.                     |
-| `coding-plan-usage` | Mod só código: `/coding-plan-usage` abre num painel lateral o consumo do plano lido de `~/scripts/commands/coding-plan-usage`. |
+| Plugin    | O que faz                                                                                                                                                                     |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toolbox` | Mod só código: ícone de caixa de ferramentas acima do prompt; ao clicar, expande os atalhos do lot-map e do effort-optimizer. `/toolbox` ou o menu de clique direito reabrem. |
+| `lot-map` | Mod de terceiros: mapa ao vivo num painel lateral; cada chamada de ferramenta, passo do modelo, hook e skill acende sua estação.                                              |
 
 ## Instalar ou atualizar
 
@@ -30,7 +30,7 @@ Abra uma nova sessão do Claude Code depois de instalar ou atualizar.
 
 ```bash
 claude plugin marketplace add gugacarbo/claude-plugins
-claude plugin install pr-band@gugacarbo-plugins
+claude plugin install effort-optimizer@gugacarbo-plugins
 ```
 
 Para atualizar: `claude plugin marketplace update gugacarbo-plugins` e

@@ -13,7 +13,8 @@
 			"!**/.vitest-coverage*",
 			"!**/storybook-static",
 			"!**/src/routeTree.gen.ts",
-			"!**/plugins/effort-optimizer"
+			"!**/plugins/effort-optimizer",
+			"!**/plugins/lot-map"
 		]
 	},
 	"formatter": {

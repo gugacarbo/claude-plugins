@@ -8,7 +8,8 @@ Marketplace pessoal de plugins do Claude Code (`gugacarbo-plugins`).
 .claude-plugin/marketplace.json   # lista dos plugins do marketplace
 .agents/skills/                   # skills oficiais do plugin-dev (Anthropic) p/ instruir agentes
 plugins/
-  pr-band/                        # mod só código: faixa acima do prompt + painel lateral
+  toolbox/                        # mod só código: ícone acima do prompt com atalhos dos painéis
+  lot-map/                        # mod de terceiros (alexeyw/lot-map): mapa ao vivo da atividade
   effort-optimizer/               # mod de terceiros (Ben AI): escolhe o effort de cada prompt
 src/
   index.ts                        # CLI: install | update | status [--remote] [--dry-run]
@@ -35,17 +36,6 @@ src/
 2. Adicione `{ "name", "source": "./plugins/<nome>", "description" }` em
    `.claude-plugin/marketplace.json`.
 3. Rode `claude plugin validate plugins/<nome>` e `bun run plugins:install`.
-
-## pr-band
-
-- Fontes dos PRs (via `gh pr view`): PR da branch atual; PRs criados/editados/mergeados na
-  sessão (`gitOperation.pr` do resultado do Bash); links `github.com/.../pull/N` citados no chat
-  ou na saída de comandos. Atualiza ao fim de cada turno.
-- Os painéis do PR e da worktree têm as abas Arquivos e Imagens. Imagens mostra antes/depois de
-  cada imagem alterada (PR: `gh api` no base e no head; worktree: `HEAD` e o disco) num `Svg`
-  com data URI, limitado a 131072 caracteres; acima disso reduz com `ffmpeg` se houver.
-- `plugins/pr-band/.claude-plugin/types/` é gerado pelo Claude Code ao carregar o mod e não é
-  versionado. O `tsc` da raiz cobre só `src/`; valide o mod com `claude plugin validate`.
 
 ## packages/ui — componentes e helpers de UI compartilhados
 

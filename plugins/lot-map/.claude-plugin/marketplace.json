@@ -1,0 +1,13 @@
+{
+  "name": "lot-map",
+  "description": "A live map of Claude Code's work, drawn beside the chat",
+  "owner": {
+    "name": "alexeyw"
+  },
+  "plugins": [
+    {
+      "name": "lot-map",
+      "source": "./"
+    }
+  ]
+}
