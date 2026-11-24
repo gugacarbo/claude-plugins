@@ -52,6 +52,8 @@ export type UsageLog = {
 
 declare module 'claude-code' {
   interface PluginState {
+    /** The toolbox plugin's request to open a pane (declared here so this plugin can hear it without depending on toolbox). */
+    toolbox: { request: { target: string; n: number } | null }
     'effort-optimizer': {
       band: Band | null
       /** Shown above the prompt while the pick runs, e.g. "picking effort…". */

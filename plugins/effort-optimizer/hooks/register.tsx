@@ -449,6 +449,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'effort-optimizer-panel',
       description: 'Effort Optimizer: abre o painel lateral com informações e configurações',
+      immediate: true,
     })
     await $.command.register({
       name: 'effort-optimizer-level',
@@ -518,7 +519,8 @@ export const register: Register = on => {
       value = enabled && hold ? hold.level : null
     }
     // Whatever the mod holds still has to be a level this model allows.
-    const wanted = turnLevel ?? (enabled ? (value ?? null) : null)
+    // With nothing held, the picker's own level is held to the list too.
+    const wanted = turnLevel ?? (enabled ? (value ?? asLevel(e.effort)) : null)
     const want = wanted ? clamp(wanted, family) : null
     if (!want || want === e.effort) return yield* next(e)
     void log($, 'request', `${e.effort} -> ${want}`)
@@ -605,6 +607,13 @@ export const register: Register = on => {
         ? 'Painel do Effort Optimizer aberto.'
         : 'O painel está aberto, mas a janela é estreita demais para mostrá-lo agora. Aumente a janela.',
     }
+  })
+
+  // A press on the toolbox's Effort Optimizer button: open the panel now, even mid-turn.
+  on('state.set', { plugin: 'toolbox', key: 'request' }, async ($, e, next) => {
+    const result = await next(e)
+    if (e.value?.target === 'effort-optimizer') void openPanel($).catch(() => undefined)
+    return result
   })
 
   on('ui.render', { component: 'Pane', requestId: PANEL }, async ($, e) => {
@@ -874,6 +883,26 @@ export const register: Register = on => {
     return { element: e.element }
   })
 
+  on('ui.press', { plugin: 'effort-optimizer', element: 'applied-close' }, async ($, e) => {
+    await setBand($, null)
+    return { element: e.element }
+  })
+
+  // While the pick runs: a small sign in the hint line under the prompt, at its left, instead of a row above it.
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (off || !enabled) return next(e)
+    const { value: checking } = await $.state.get(CHECKING)
+    if (!checking) return next(e)
+    if (e.surface === 'terminal') return next({ ...e, props: { ...e.props, tail: ` · ◌ ${checking}` } })
+    const { Text } = $.ui.resolve(e)
+    return (
+      <Text>
+        <Text color={ACCENT}>◌</Text>
+        <Text dimColor> {checking}</Text>
+      </Text>
+    )
+  })
+
   on('ui.press', { plugin: 'effort-optimizer', element: 'skip' }, async ($, e) => {
     await setBand($, null)
     return { element: e.element }
@@ -895,24 +924,10 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (off || !enabled || e.props.hasSurvey) return next(e)
-    const { value: checking } = await $.state.get(CHECKING)
     const b = await getBand($)
-    if (!b && !checking) return next(e)
+    if (!b) return next(e)
     const rest = await next(e)
     const { Box, Text, Button } = $.ui.resolve(e)
-
-    if (checking) {
-      return (
-        <Box flexDirection="column">
-          {rest}
-          <Text>
-            <Text color={ACCENT}>◌</Text>
-            <Text dimColor> {checking}</Text>
-          </Text>
-        </Box>
-      )
-    }
-    if (!b) return rest
     const noop = () => undefined
 
     if (b.phase === 'applied') {
@@ -928,6 +943,8 @@ export const register: Register = on => {
               {b.why ? <Text dimColor> · {b.why}</Text> : null}
             </Text>
             <Button key="info" label="ⓘ Learn more" variant="secondary" onPress={noop} />
+            <Box flexGrow={1} />
+            <Button key="applied-close" label="✕" plain dimColor onPress={noop} />
           </Box>
         </Box>
       )
