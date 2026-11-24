@@ -1,6 +1,6 @@
 {
   "name": "toolbox",
-  "version": "0.2.1",
+  "version": "0.8.0",
   "description": "Ícone de ferramentas acima do prompt que expande os atalhos dos painéis dos plugins (lot-map, effort-optimizer).",
   "types": "./types/index.d.ts",
   "author": {
