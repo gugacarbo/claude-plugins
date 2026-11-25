@@ -8,6 +8,7 @@ import {
 	plan,
 } from "./plan";
 import { syncUiToPlugins } from "./sync-ui";
+import { runUpstream } from "./upstream-git";
 
 const REPO = "gugacarbo/claude-plugins";
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -25,6 +26,11 @@ async function claude(args: string[]): Promise<string> {
 }
 
 async function main(): Promise<void> {
+	const [first] = Bun.argv.slice(2);
+	if (first === "import" || first === "upstream") {
+		await runUpstream(ROOT, Bun.argv.slice(2));
+		return;
+	}
 	const { command, remote, dryRun } = parseArgs(Bun.argv.slice(2));
 	const marketplace: Marketplace = await Bun.file(
 		join(ROOT, ".claude-plugin/marketplace.json"),

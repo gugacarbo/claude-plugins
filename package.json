@@ -26,6 +26,8 @@
 		"plugins:install": "bun src/index.ts install",
 		"plugins:update": "bun src/index.ts update",
 		"plugins:status": "bun src/index.ts status",
+		"plugins:import": "bun src/index.ts import",
+		"plugins:upstream": "bun src/index.ts upstream",
 		"prepare": "husky",
 		"storybook": "storybook dev -p 6006",
 		"build-storybook": "storybook build"

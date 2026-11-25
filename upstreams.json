@@ -1,0 +1,8 @@
+{
+  "lot-map": {
+    "repo": "https://github.com/alexeyw/lot-map.git",
+    "ref": "main",
+    "path": ".",
+    "base": "ea9de48f1bd13e29199e47c527aba84628bbf75c"
+  }
+}

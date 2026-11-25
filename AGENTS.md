@@ -7,13 +7,17 @@ Marketplace pessoal de plugins do Claude Code (`gugacarbo-plugins`).
 ```
 .claude-plugin/marketplace.json   # lista dos plugins do marketplace
 .agents/skills/                   # skills oficiais do plugin-dev (Anthropic) p/ instruir agentes
+  manage-plugins/                 # skill do repo: instalar, editar, importar e atualizar plugins
 plugins/
   toolbox/                        # mod só código: ícone acima do prompt com atalhos dos painéis
   lot-map/                        # mod de terceiros (alexeyw/lot-map): mapa ao vivo da atividade
   effort-optimizer/               # mod de terceiros (Ben AI): escolhe o effort de cada prompt
+upstreams.json                    # origem dos plugins importados de outros repos
 src/
-  index.ts                        # CLI: install | update | status [--remote] [--dry-run]
+  index.ts                        # CLI: install | update | status | import | upstream
   plan.ts                         # lógica pura do que rodar (testada em plan.test.ts)
+  upstream.ts                     # lógica pura dos plugins importados (upstream.test.ts)
+  upstream-git.ts                 # import, status e pull via git
 ```
 
 ## Como usar
@@ -36,6 +40,21 @@ src/
 2. Adicione `{ "name", "source": "./plugins/<nome>", "description" }` em
    `.claude-plugin/marketplace.json`.
 3. Rode `claude plugin validate plugins/<nome>` e `bun run plugins:install`.
+
+## Plugins importados de outros repos
+
+Plugins de terceiros são cópias editáveis em `plugins/<nome>/`, com a origem registrada
+em `upstreams.json` (`repo`, `ref`, `path` e `base`, o commit do upstream em que a cópia se baseia).
+
+- Importar: `bun run plugins:import <repo> [--ref main] [--path pasta/no/upstream] [--name nome]`.
+  Copia a pasta, registra a origem e adiciona ao `marketplace.json`. Não commita.
+- Ver se há atualização: `bun run plugins:upstream status`.
+- Atualizar: `bun run plugins:upstream pull [nomes...]`. Aplica o diff `base..novo` do upstream
+  sobre a cópia local com merge de 3 vias (as suas alterações ficam), avança o `base` e
+  incrementa o `version` do `plugin.json`. Com conflito, deixa os marcadores e sai com código 2.
+  Exige os plugins sem mudanças não commitadas. Não commita.
+- O workflow `.github/workflows/upstream.yml` roda o pull toda segunda e abre um PR.
+- Para conflitos raros, prefira alterar em arquivos novos a editar muito os do upstream.
 
 ## packages/ui — componentes e helpers de UI compartilhados
 

@@ -1,0 +1,55 @@
+name: Upstream
+
+# Puxa as atualizações dos plugins importados (upstreams.json) e abre um PR.
+# Conflitos entram no PR com os marcadores, listados no corpo, para resolver lá.
+# Requer "Allow GitHub Actions to create and approve pull requests" nas configurações do repo.
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - name: Pull upstreams
+        id: pull
+        run: |
+          set +e
+          bun src/index.ts upstream pull | tee pull.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -eq 2 ]; then
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+          elif [ "$code" -ne 0 ]; then
+            exit "$code"
+          fi
+          {
+            echo "log<<EOF"
+            cat pull.log
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          rm pull.log
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: chore/upstream
+          delete-branch: true
+          commit-message: "chore(upstream): atualiza plugins importados"
+          title: "${{ steps.pull.outputs.conflict == 'true' && 'chore(upstream): atualiza plugins importados (com conflitos)' || 'chore(upstream): atualiza plugins importados' }}"
+          body: |
+            Atualizações dos plugins listados em `upstreams.json`.
+
+            ```
+            ${{ steps.pull.outputs.log }}
+            ```
+
+            ${{ steps.pull.outputs.conflict == 'true' && '**Há conflitos:** resolva os marcadores nos arquivos listados acima antes de mergear.' || '' }}
